@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
@@ -110,19 +110,7 @@ const VerifyEmail: React.FC = () => {
   const [token, setToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(true);
 
-  useEffect(() => {
-    const tokenParam = searchParams.get('token');
-    if (!tokenParam) {
-      setError('Invalid or missing verification token');
-      setIsVerifying(false);
-    } else {
-      setToken(tokenParam);
-      // Auto-verify if token is present
-      handleVerify(tokenParam);
-    }
-  }, [searchParams, handleVerify]);
-
-  const handleVerify = async (verifyToken?: string) => {
+  const handleVerify = useCallback(async (verifyToken?: string) => {
     const tokenToUse = verifyToken || token;
     if (!tokenToUse) return;
 
@@ -142,7 +130,19 @@ const VerifyEmail: React.FC = () => {
       setIsLoading(false);
       setIsVerifying(false);
     }
-  };
+  }, [token, navigate]);
+
+  useEffect(() => {
+    const tokenParam = searchParams.get('token');
+    if (!tokenParam) {
+      setError('Invalid or missing verification token');
+      setIsVerifying(false);
+    } else {
+      setToken(tokenParam);
+      // Auto-verify if token is present
+      handleVerify(tokenParam);
+    }
+  }, [searchParams, handleVerify]);
 
   const handleResendVerification = async () => {
     setIsLoading(true);
