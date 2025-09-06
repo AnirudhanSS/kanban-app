@@ -5,7 +5,7 @@ import { Card as CardType } from '../../services/cardService';
 import { socketService } from '../../services/socketService';
 import Modal from '../Modal';
 import { CardBorder, CardBottom, CardContainer, CardTitle, CardDescription, CardActions, ActionButton, UserIndicator, StatusIndicator } from './styles';
-import Labels from '../Labels';
+// import Labels from '../Labels';
 
 interface CardProps {
   card: CardType;
@@ -67,9 +67,10 @@ const Card: React.FC<CardProps> = ({
 
   // Reset drag state when component unmounts or card changes
   useEffect(() => {
+    const currentDragState = dragStateRef.current;
     return () => {
       // Clean up any pending move events
-      if (dragStateRef.current.hasEmittedStart && boardId) {
+      if (currentDragState.hasEmittedStart && boardId) {
         socketService.endCardMove(card.id, boardId);
       }
     };

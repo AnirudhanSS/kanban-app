@@ -58,7 +58,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // return () => {
     //   socketService.disconnect();
     // };
-  }, [isAuthenticated, user?.id]); // Use user.id instead of user object
+  }, [isAuthenticated, user]); // Include full user object
 
   const joinBoard = (boardId: string) => {
     socketService.joinBoard(boardId);

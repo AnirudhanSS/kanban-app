@@ -120,7 +120,7 @@ const VerifyEmail: React.FC = () => {
       // Auto-verify if token is present
       handleVerify(tokenParam);
     }
-  }, [searchParams]);
+  }, [searchParams, handleVerify]);
 
   const handleVerify = async (verifyToken?: string) => {
     const tokenToUse = verifyToken || token;
