@@ -1,5 +1,11 @@
 import api from './api';
 
+export interface Label {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Card {
   id: string;
   column_id: string;

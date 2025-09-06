@@ -19,6 +19,7 @@ declare module 'styled-components' {
       text_tertiary: string,
       placeholder: string,
       background: string,
+      background_secondary: string,
       components_background: string,
       border: string,
       switch: string,

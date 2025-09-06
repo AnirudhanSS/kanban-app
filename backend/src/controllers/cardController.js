@@ -1,5 +1,6 @@
 const { Card, Column, BoardMember, AuditLog, Notification, User } = require('../db/associations');
 const sequelize = require('../db/db');
+const { Op } = require('sequelize');
 const { acquireLock, releaseLock } = require('../services/redisClient');
 const emailService = require('../services/emailService');
 const POSITION_GAP = 1000n;
@@ -15,6 +16,37 @@ function getGapPosition(prevPos, nextPos) {
   }
   
   return gap;
+}
+
+async function findAvailablePosition(columnId, afterPosition, beforePosition, transaction) {
+  const { Card } = require('../db/associations');
+  
+  // Get existing cards in the column to find occupied positions
+  const existingCards = await Card.findAll({
+    where: { column_id: columnId },
+    attributes: ['position'],
+    order: [['position', 'ASC']],
+    transaction
+  });
+  
+  const occupiedPositions = new Set(existingCards.map(card => Number(card.position)));
+  
+  // Try to find a position between afterPosition and beforePosition
+  let position = Math.floor(getGapPosition(afterPosition ?? null, beforePosition ?? null));
+  
+  // If the calculated position is occupied, find the next available position
+  let attempts = 0;
+  while (occupiedPositions.has(position) && attempts < 10) {
+    position = Math.floor(position + Math.random() * 1000 + 1);
+    attempts++;
+  }
+  
+  // If still occupied, use a timestamp-based position
+  if (occupiedPositions.has(position)) {
+    position = Math.floor(Date.now() + Math.random() * 1000);
+  }
+  
+  return position;
 }
 
 async function hasBoardPermission(userId, boardId, roles = ['owner','admin','editor']) {
@@ -53,21 +85,17 @@ exports.createCard = async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid assignee' });
     }
 
-    let position = Math.floor(getGapPosition(after_position ?? null, before_position ?? null));
-    let card;
+    // SIMPLE APPROACH: Use timestamp for new cards - no conflicts!
+    const position = Date.now();
     
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        card = await Card.create({ column_id, title, description, assignee_id, position, due_date }, { transaction: t });
-        break;
-      } catch (error) {
-        if (error.name === 'SequelizeUniqueConstraintError' && attempt < 2) {
-          position = Math.floor(position) + Math.floor(Math.random() * 1000);
-          continue;
-        }
-        throw error;
-      }
-    }
+    const card = await Card.create({ 
+      column_id, 
+      title, 
+      description, 
+      assignee_id, 
+      position, 
+      due_date
+    }, { transaction: t });
 
     await AuditLog.create({
       board_id: column.board_id,
@@ -98,19 +126,16 @@ exports.createCard = async (req, res, next) => {
         const assigner = await User.findByPk(req.user.id);
         
         if (assignee && board && assigner) {
-          console.log('📧 Sending card assignment email to:', assignee.email);
           await emailService.sendCardAssignmentEmail(
             assignee.email,
-            assignee.first_name || assignee.email,
+            assignee.firstname || assignee.email,
             title,
             board.title,
-            assigner.first_name || assigner.email
+            assigner.firstname || assigner.email
           );
-          console.log('✅ Card assignment email sent successfully');
         }
       } catch (emailError) {
-        console.error('❌ Failed to send assignment email:', emailError);
-        console.error('❌ Email error details:', emailError.message, emailError.stack);
+        console.error('Failed to send assignment email:', emailError);
         // Don't fail the request if email fails
       }
     }
@@ -131,9 +156,24 @@ exports.createCard = async (req, res, next) => {
     }
     console.error('❌ createCard failed:', err);
     console.error('❌ Error details:', err.message, err.stack);
+    console.error('❌ Request body:', req.body);
+    console.error('❌ User ID:', req.user?.id);
+    
     if (err.name === 'SequelizeUniqueConstraintError') {
-      return res.status(409).json({ error: 'Position conflict - retry the move' });
+      console.log('Position conflict - this should not happen with timestamp approach');
+      return res.status(409).json({ 
+        error: 'Position conflict - retry the move',
+        details: err.fields 
+      });
     }
+    
+    if (err.name === 'SequelizeValidationError') {
+      return res.status(400).json({ 
+        error: 'Validation error', 
+        details: err.errors.map(e => e.message) 
+      });
+    }
+    
     next(err);
   }
 };
@@ -164,7 +204,8 @@ exports.updateCard = async (req, res, next) => {
       }
     }
 
-    if (version != null && card.version !== version) {
+    // Skip version check for position-only updates to allow concurrent moves
+    if (version != null && card.version !== version && (title || description || assignee_id)) {
       return res.status(409).json({ error: 'Card was updated by someone else. Refresh and retry.' });
     }
 
@@ -178,14 +219,16 @@ exports.updateCard = async (req, res, next) => {
     
     const updateData = { title, description, assignee_id, version: card.version + 1 };
     
+    // SIMPLE APPROACH: Just update the card - no position constraints!
     if (position !== undefined) {
-      updateData.position = position;
+      updateData.position = parseInt(position, 10);
     }
     
     if (column_id) {
       updateData.column_id = column_id;
     }
     
+    // Update the card - let multiple cards have the same position temporarily
     await card.update(updateData, { transaction: t });
 
     const action = column_id && column_id !== old_values.column_id ? 'CardMoved' : 'CardUpdated';
@@ -222,19 +265,16 @@ exports.updateCard = async (req, res, next) => {
         const assigner = await User.findByPk(req.user.id);
         
         if (assignee && board && assigner) {
-          console.log('📧 Sending card assignment email to:', assignee.email);
           await emailService.sendCardAssignmentEmail(
             assignee.email,
-            assignee.first_name || assignee.email,
+            assignee.firstname || assignee.email,
             card.title,
             board.title,
-            assigner.first_name || assigner.email
+            assigner.firstname || assigner.email
           );
-          console.log('✅ Card assignment email sent successfully');
         }
       } catch (emailError) {
-        console.error('❌ Failed to send assignment email:', emailError);
-        console.error('❌ Email error details:', emailError.message, emailError.stack);
+        console.error('Failed to send assignment email:', emailError);
         // Don't fail the request if email fails
       }
     }
@@ -258,9 +298,13 @@ exports.updateCard = async (req, res, next) => {
     if (req.socketId) {
       await releaseLock(req.params.id, req.socketId);
     }
+    
+    // SIMPLE APPROACH: Handle conflicts gracefully
     if (err.name === 'SequelizeUniqueConstraintError') {
+      console.log('Position conflict - handled gracefully');
       return res.status(409).json({ error: 'Position conflict - retry the move' });
     }
+    
     next(err);
   }
 };

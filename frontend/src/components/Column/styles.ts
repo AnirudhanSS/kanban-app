@@ -32,6 +32,7 @@ export const ColumnHeader = styled.div`
     font-weight: 700;
     color: ${({ theme }) => theme.colors.text};
     letter-spacing: -0.02em;
+    flex: 1;
   }
   
   span {
@@ -44,6 +45,25 @@ export const ColumnHeader = styled.div`
     min-width: 24px;
     text-align: center;
     box-shadow: 0 2px 4px rgba(235, 98, 47, 0.3);
+  }
+`;
+
+export const DragHandle = styled.div`
+  cursor: grab;
+  color: ${({ theme }) => theme.colors.text_secondary};
+  font-size: 1.2rem;
+  margin-right: 0.5rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.background_secondary};
+    color: ${({ theme }) => theme.colors.text};
+  }
+  
+  &:active {
+    cursor: grabbing;
   }
 `;
 

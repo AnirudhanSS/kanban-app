@@ -10,7 +10,10 @@ const User = sequelize.define('User', {
   last_name: { type: DataTypes.STRING(100), allowNull: true },
   avatar_url: { type: DataTypes.TEXT, allowNull: true },
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
-  is_deleted: { type: DataTypes.BOOLEAN, defaultValue: false } // new
+  is_deleted: { type: DataTypes.BOOLEAN, defaultValue: false },
+  is_email_verified: { type: DataTypes.BOOLEAN, defaultValue: false },
+  email_verification_token: { type: DataTypes.STRING, allowNull: true },
+  email_verification_expires: { type: DataTypes.DATE, allowNull: true }
 }, {
   tableName: 'users',
   timestamps: true,

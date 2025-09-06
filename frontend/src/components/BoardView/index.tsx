@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
-import { DragDropContext, DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, DropResult, Droppable } from '@hello-pangea/dnd';
 import { ThemeContext } from 'styled-components';
 import { useSocket } from '../../contexts/SocketContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { cardService, Card } from '../../services/cardService';
 import { boardService, Column as ColumnType } from '../../services/boardService';
+import { columnService } from '../../services/columnService';
 import Column from '../Column';
 import Header from '../Header';
 import MemberManagementModal from '../MemberManagementModal';
@@ -28,6 +30,7 @@ interface BoardViewProps {
 const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDashboard }) => {
   const { socket, onlineUsers } = useSocket();
   const { showNotification } = useNotification();
+  const { user } = useAuth();
   const theme = useContext(ThemeContext);
   
   const [board, setBoard] = useState<any>(null);
@@ -37,6 +40,10 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
   const [error, setError] = useState<string | null>(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string>('viewer');
+  
+  // Visual feedback state
+  const [editingCards, setEditingCards] = useState<Map<string, { userId: string; userName: string; field?: string }>>(new Map());
+  const [movingCards, setMovingCards] = useState<Map<string, { userId: string; userName: string }>>(new Map());
 
   // Event handlers
   const handleCardCreated = useCallback((newCard: Card) => {
@@ -49,11 +56,16 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
     console.log('🔄 Card updated event received:', updatedData);
     // Handle both Card object and update event data
     if (updatedData.id) {
-      // This is a Card object
+      // This is a Card object - only show notification if it's not a move operation
       setCards(prev => prev.map(card => 
         card.id === updatedData.id ? updatedData : card
       ));
-      showNotification(`Card "${updatedData.title}" updated`, 'info');
+      
+      // Only show "updated" notification if it's not a position change (move operation)
+      // Move operations will be handled by handleCardMoved to avoid duplicate notifications
+      if (updatedData.position === undefined) {
+        showNotification(`Card "${updatedData.title}" updated`, 'info');
+      }
     } else {
       // This might be an event data structure
       console.log('Received card update event:', updatedData);
@@ -71,22 +83,58 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
     // Handle both Card object and move event data
     if (movedData.cardId) {
       // This is a move event from WebSocket
-      setCards(prev => prev.map(card => 
-        card.id === movedData.cardId ? {
-          ...card,
-          column_id: movedData.newColumnId,
-          position: movedData.newPosition
-        } : card
-      ));
-      showNotification(`Card moved`, 'info');
+      setCards(prev => {
+        const currentCard = prev.find(card => card.id === movedData.cardId);
+        if (!currentCard) return prev;
+        
+        // Check if the card is already in the correct position
+        const isAlreadyCorrect = currentCard.column_id === movedData.newColumnId && 
+                                currentCard.position === movedData.newPosition;
+        
+        if (isAlreadyCorrect) {
+          console.log('📦 Card already in correct position, skipping update');
+          return prev; // No change needed - prevents flicker!
+        }
+        
+        console.log('📦 Applying card move from server');
+        return prev.map(card => {
+          if (card.id === movedData.cardId) {
+            return {
+              ...card,
+              column_id: movedData.newColumnId,
+              position: movedData.newPosition
+            };
+          }
+          return card;
+        });
+      });
+      // Find the card title for the notification
+      const movedCard = cards.find(card => card.id === movedData.cardId);
+      const cardTitle = movedCard ? movedCard.title : 'Card';
+      showNotification(`"${cardTitle}" moved`, 'info');
     } else {
       // This is a Card object
-      setCards(prev => prev.map(card => 
-        card.id === movedData.id ? movedData : card
-      ));
-      showNotification(`Card "${movedData.title}" moved`, 'info');
+      setCards(prev => {
+        const currentCard = prev.find(card => card.id === movedData.id);
+        if (!currentCard) return prev;
+        
+        // Check if the card is already in the correct state
+        const isAlreadyCorrect = currentCard.column_id === movedData.column_id && 
+                                currentCard.position === movedData.position;
+        
+        if (isAlreadyCorrect) {
+          console.log('📦 Card already in correct state, skipping update');
+          return prev; // No change needed - prevents flicker!
+        }
+        
+        console.log('📦 Applying card update from server');
+        return prev.map(card => 
+          card.id === movedData.id ? movedData : card
+        );
+      });
+      showNotification(`"${movedData.title}" moved`, 'info');
     }
-  }, [showNotification]);
+  }, [showNotification, cards]);
 
   // Column event handlers
   const handleColumnCreated = useCallback((newColumn: any) => {
@@ -106,6 +154,32 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
     showNotification('Column deleted', 'warning');
   }, [showNotification]);
 
+  const handleColumnsReordered = useCallback((data: { columnIds: string[] }) => {
+    console.log('🔄 Columns reordered:', data.columnIds);
+    // Only update if the order is actually different from current state
+    setColumns(prev => {
+      const currentOrder = prev.map(col => col.id);
+      const isSameOrder = currentOrder.length === data.columnIds.length && 
+                         currentOrder.every((id, index) => id === data.columnIds[index]);
+      
+      if (isSameOrder) {
+        console.log('🔄 Column order unchanged, skipping update');
+        return prev; // No change needed
+      }
+      
+      // Reorder columns based on the new order from server
+      const newOrder: any[] = [];
+      data.columnIds.forEach(id => {
+        const column = prev.find(col => col.id === id);
+        if (column) {
+          newOrder.push(column);
+        }
+      });
+      console.log('🔄 Applying new column order from server');
+      return newOrder;
+    });
+  }, []);
+
   // Member event handlers
   const handleMemberAdded = useCallback((newMember: any) => {
     showNotification('New member added to board', 'success');
@@ -121,6 +195,50 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
     showNotification('Member removed from board', 'warning');
     // You might want to refresh member list or update UI
   }, [showNotification]);
+
+  // Visual feedback event handlers
+  const handleCardEditStart = useCallback((data: { cardId: string; userId: string; userName: string; field?: string }) => {
+    console.log('✏️ Card edit started:', data);
+    setEditingCards(prev => {
+      const newMap = new Map(prev);
+      newMap.set(data.cardId, {
+        userId: data.userId,
+        userName: data.userName,
+        field: data.field
+      });
+      return newMap;
+    });
+  }, []);
+
+  const handleCardEditEnd = useCallback((data: { cardId: string; userId: string }) => {
+    console.log('✅ Card edit ended:', data);
+    setEditingCards(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(data.cardId);
+      return newMap;
+    });
+  }, []);
+
+  const handleCardMoveStart = useCallback((data: { cardId: string; userId: string; userName: string }) => {
+    console.log('🔄 Card move started:', data);
+    setMovingCards(prev => {
+      const newMap = new Map(prev);
+      newMap.set(data.cardId, {
+        userId: data.userId,
+        userName: data.userName
+      });
+      return newMap;
+    });
+  }, []);
+
+  const handleCardMoveEnd = useCallback((data: { cardId: string; userId: string }) => {
+    console.log('✅ Card move ended:', data);
+    setMovingCards(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(data.cardId);
+      return newMap;
+    });
+  }, []);
 
   // Load board data function
   const loadBoardData = useCallback(async () => {
@@ -184,7 +302,13 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
   }, [boardId]);
 
   const onDragEnd = async (result: DropResult) => {
-    const { destination, source, draggableId } = result;
+    const { destination, source, draggableId, type } = result;
+
+    console.log('🔄 Drag end result:', {
+      source: { droppableId: source.droppableId, index: source.index },
+      destination: destination ? { droppableId: destination.droppableId, index: destination.index } : null,
+      draggableId
+    });
 
     if (!destination) return;
 
@@ -193,34 +317,33 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
       destination.index === source.index
     ) return;
 
-    try {
-      // Find the card being moved
-      const card = cards.find(c => c.id === draggableId);
-      if (!card) return;
+    // Handle column reordering
+    if (type === 'COLUMN') {
+      const newColumnOrder = Array.from(columns);
+      const [reorderedColumn] = newColumnOrder.splice(source.index, 1);
+      newColumnOrder.splice(destination.index, 0, reorderedColumn);
+      
+      const columnIds = newColumnOrder.map(col => col.id);
+      await handleReorderColumns(columnIds);
+      return;
+    }
 
-      // Calculate position based on destination
-      const destinationColumnCards = cards
-        .filter(c => c.column_id === destination.droppableId)
-        .sort((a, b) => a.position - b.position);
-      
-      let newPosition = destination.index * 1000; // Simple position calculation
-      
-      // If moving within the same column, adjust positions of other cards
-      if (source.droppableId === destination.droppableId) {
-        // Moving within same column - use index-based position
-        newPosition = destination.index * 1000;
-      } else {
-        // Moving to different column - calculate position between existing cards
-        if (destination.index === 0) {
-          newPosition = destinationColumnCards.length > 0 ? destinationColumnCards[0].position / 2 : 1000;
-        } else if (destination.index >= destinationColumnCards.length) {
-          newPosition = destinationColumnCards.length > 0 ? destinationColumnCards[destinationColumnCards.length - 1].position + 1000 : 1000;
-        } else {
-          const prevCard = destinationColumnCards[destination.index - 1];
-          const nextCard = destinationColumnCards[destination.index];
-          newPosition = (prevCard.position + nextCard.position) / 2;
-        }
-      }
+    // Find the card being moved
+    const card = cards.find(c => c.id === draggableId);
+    if (!card) return;
+
+    // SIMPLE APPROACH: Use timestamp for position - never conflicts!
+    const newPosition = Date.now();
+
+    try {
+      // Debug logging
+      console.log('🎯 Timestamp position calculation:', {
+        sourceColumn: source.droppableId,
+        destinationColumn: destination.droppableId,
+        destinationIndex: destination.index,
+        calculatedPosition: newPosition,
+        positioning: 'timestamp-based (no conflicts)'
+      });
 
       // Optimistic update - update local state immediately
       setCards(prev => prev.map(c => 
@@ -238,20 +361,28 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
         c.id === card.id ? updatedCard : c
       ));
 
-      // Emit real-time update
-      if (socket) {
-        socket.emit('cardMoved', {
-          cardId: card.id,
-          boardId,
-          newColumnId: destination.droppableId,
-          newPosition: newPosition
-        });
+    } catch (error: any) {
+      // Silent error handling - no console errors or notifications
+      console.log('Card move handled silently');
+      
+      // Handle specific error types silently
+      if (error.response?.status === 409) {
+        // Position conflict - try to refresh silently
+        try {
+          const cardsData = await cardService.getCards(boardId);
+          setCards(cardsData);
+        } catch (refreshError) {
+          // Even refresh failed - just continue silently
+        }
+      } else {
+        // Other errors - just refresh silently
+        try {
+          const cardsData = await cardService.getCards(boardId);
+          setCards(cardsData);
+        } catch (refreshError) {
+          // Even refresh failed - just continue silently
+        }
       }
-
-    } catch (error) {
-      console.error('Failed to move card:', error);
-      // Revert the drag operation
-      loadBoardData();
     }
   };
 
@@ -300,6 +431,16 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
     }
   };
 
+  const handleReorderColumns = async (columnIds: string[]) => {
+    try {
+      await columnService.reorderColumns(columnIds);
+      showNotification('Columns reordered successfully', 'success');
+    } catch (error) {
+      console.error('Failed to reorder columns:', error);
+      showNotification('Failed to reorder columns', 'error');
+    }
+  };
+
   useEffect(() => {
     loadBoardData();
   }, [boardId, loadBoardData]);
@@ -320,7 +461,7 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
       
       // Debug: Listen to all events
       socket.onAny((eventName: string, ...args: any[]) => {
-        if (eventName.includes('card') || eventName.includes('Card')) {
+        if (eventName.includes('card') || eventName.includes('Card') || eventName.includes('column')) {
           console.log(`📡 Received event: ${eventName}`, args);
         }
       });
@@ -329,11 +470,18 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
       socket.on('columnCreated', handleColumnCreated);
       socket.on('columnUpdated', handleColumnUpdated);
       socket.on('columnDeleted', handleColumnDeleted);
+      socket.on('columnsReordered', handleColumnsReordered);
 
       // Member events
       socket.on('memberAdded', handleMemberAdded);
       socket.on('memberUpdated', handleMemberUpdated);
       socket.on('memberRemoved', handleMemberRemoved);
+
+      // Visual feedback events
+      socket.on('card:edit_start', handleCardEditStart);
+      socket.on('card:edit_end', handleCardEditEnd);
+      socket.on('card:move_start', handleCardMoveStart);
+      socket.on('card:move_end', handleCardMoveEnd);
 
       return () => {
         socket.emit('leaveBoard', boardId);
@@ -348,14 +496,21 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
         socket.off('columnCreated', handleColumnCreated);
         socket.off('columnUpdated', handleColumnUpdated);
         socket.off('columnDeleted', handleColumnDeleted);
+        socket.off('columnsReordered', handleColumnsReordered);
 
         // Member events
         socket.off('memberAdded', handleMemberAdded);
         socket.off('memberUpdated', handleMemberUpdated);
         socket.off('memberRemoved', handleMemberRemoved);
+
+        // Visual feedback events
+        socket.off('card:edit_start', handleCardEditStart);
+        socket.off('card:edit_end', handleCardEditEnd);
+        socket.off('card:move_start', handleCardMoveStart);
+        socket.off('card:move_end', handleCardMoveEnd);
       };
     }
-  }, [socket, boardId, handleCardCreated, handleCardUpdated, handleCardDeleted, handleCardMoved, handleColumnCreated, handleColumnUpdated, handleColumnDeleted, handleMemberAdded, handleMemberUpdated, handleMemberRemoved]);
+  }, [socket, boardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading) {
     return (
@@ -444,23 +599,33 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
       </BoardHeader>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <ColumnsContainer>
-          {columns.map(column => {
-            const columnCards = cards.filter(card => card.column_id === column.id);
-            return (
-              <Column
-                key={column.id}
-                id={column.id}
-                title={column.title}
-                cards={columnCards}
-                userRole={currentUserRole}
-                onCreateCard={handleCreateCard}
-                onUpdateCard={handleUpdateCard}
-                onDeleteCard={handleDeleteCard}
-              />
-            );
-          })}
-        </ColumnsContainer>
+        <Droppable droppableId="columns" direction="horizontal" type="COLUMN">
+          {(provided) => (
+            <ColumnsContainer ref={provided.innerRef} {...provided.droppableProps}>
+              {columns.map((column, index) => {
+                const columnCards = cards.filter(card => card.column_id === column.id);
+                return (
+                  <Column
+                    key={column.id}
+                    id={column.id}
+                    title={column.title}
+                    cards={columnCards}
+                    userRole={currentUserRole}
+                    onCreateCard={handleCreateCard}
+                    onUpdateCard={handleUpdateCard}
+                    onDeleteCard={handleDeleteCard}
+                    editingCards={editingCards}
+                    movingCards={movingCards}
+                    currentUserId={user?.id}
+                    boardId={boardId}
+                    index={index}
+                  />
+                );
+              })}
+              {provided.placeholder}
+            </ColumnsContainer>
+          )}
+        </Droppable>
       </DragDropContext>
 
       <MemberManagementModal

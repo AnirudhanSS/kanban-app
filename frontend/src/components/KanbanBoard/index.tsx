@@ -187,6 +187,7 @@ const { colors, title } = theme;
                   id={column.id}
                   title={column.title}
                   cards={cardsArray}
+                  index={index}
                 />
             )})}
           </DragDropContext>

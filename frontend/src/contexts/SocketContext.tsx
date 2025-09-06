@@ -31,7 +31,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   useEffect(() => {
     if (isAuthenticated && user) {
       const token = localStorage.getItem('token');
-      if (token) {
+      if (token && !socketService.isConnected()) {
         socketService.connect(token);
 
         // Set up event listeners
@@ -54,10 +54,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setOnlineUsers([]);
     }
 
-    return () => {
-      socketService.disconnect();
-    };
-  }, [isAuthenticated, user]);
+    // Don't disconnect on cleanup - let the socket stay connected
+    // return () => {
+    //   socketService.disconnect();
+    // };
+  }, [isAuthenticated, user?.id]); // Use user.id instead of user object
 
   const joinBoard = (boardId: string) => {
     socketService.joinBoard(boardId);

@@ -92,6 +92,74 @@ exports.updateColumn = async (req, res, next) => {
   }
 };
 
+exports.reorderColumns = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { columnIds } = req.body; // Array of column IDs in new order
+    
+    if (!Array.isArray(columnIds) || columnIds.length === 0) {
+      return res.status(400).json({ error: 'columnIds must be a non-empty array' });
+    }
+
+    // Get all columns to verify they exist and get board_id
+    const columns = await Column.findAll({
+      where: { id: columnIds },
+      transaction: t
+    });
+
+    if (columns.length !== columnIds.length) {
+      return res.status(400).json({ error: 'Some columns not found' });
+    }
+
+    const boardId = columns[0].board_id;
+    
+    // Check permissions
+    if (!(await hasBoardPermission(req.user.id, boardId, ['owner','admin','editor']))) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    // Update positions using simple sequential approach
+    const updates = [];
+    for (let i = 0; i < columnIds.length; i++) {
+      const newPosition = i + 1; // Simple sequential positioning (1, 2, 3...)
+      updates.push(
+        Column.update(
+          { position: newPosition },
+          { where: { id: columnIds[i] }, transaction: t }
+        )
+      );
+    }
+
+    await Promise.all(updates);
+
+    await AuditLog.create({
+      board_id: boardId,
+      user_id: req.user.id,
+      entity_type: 'board',
+      entity_id: boardId,
+      action: 'ColumnsReordered',
+      new_values: { columnIds, positions: columnIds.map((_, i) => i + 1) }
+    }, { transaction: t });
+
+    await t.commit();
+    
+    // Emit real-time update
+    if (req.io) {
+      try {
+        req.io.to(`board:${boardId}`).emit('columnsReordered', { columnIds });
+        console.log(`🔄 Emitting columnsReordered event to board:${boardId}:`, columnIds);
+      } catch (emitError) {
+        console.error('Failed to emit columns reordered event:', emitError);
+      }
+    }
+    
+    res.json({ message: 'Columns reordered successfully', columnIds });
+  } catch (err) {
+    await t.rollback();
+    next(err);
+  }
+};
+
 exports.deleteColumn = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {

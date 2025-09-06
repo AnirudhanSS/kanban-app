@@ -18,6 +18,7 @@ export interface User {
   first_name: string;
   last_name?: string;
   avatar_url?: string;
+  is_email_verified?: boolean;
 }
 
 export const authService = {
@@ -30,9 +31,8 @@ export const authService = {
 
   async signup(data: SignupData) {
     const response = await api.post('/auth/signup', data);
-    const { token, user } = response.data;
-    localStorage.setItem('token', token);
-    return { token, user };
+    // Note: signup no longer returns token immediately due to email verification
+    return response.data;
   },
 
   async getCurrentUser(): Promise<User> {
@@ -46,5 +46,25 @@ export const authService = {
 
   isAuthenticated(): boolean {
     return !!localStorage.getItem('token');
+  },
+
+  async forgotPassword(email: string) {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  async resetPassword(token: string, password: string) {
+    const response = await api.post('/auth/reset-password', { token, password });
+    return response.data;
+  },
+
+  async verifyEmail(token: string) {
+    const response = await api.post('/auth/verify-email', { token });
+    return response.data;
+  },
+
+  async resendVerification(email?: string) {
+    const response = await api.post('/auth/resend-verification', { email });
+    return response.data;
   }
 };

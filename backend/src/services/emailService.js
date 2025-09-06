@@ -110,6 +110,110 @@ class EmailService {
     }
   }
 
+  /**
+   * Send welcome email to new user
+   */
+  async sendWelcomeEmail(userEmail, firstName, lastName) {
+    try {
+      const msg = {
+        to: userEmail,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject: `🎉 Welcome to Kanban Collab!`,
+        html: this.getWelcomeTemplate(firstName, lastName, userEmail),
+        text: `Hi ${firstName}, welcome to Kanban Collab! Your account has been successfully created.`
+      };
+
+      await sgMail.send(msg);
+      console.log(`📧 Welcome email sent to ${userEmail}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send welcome email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(userEmail, firstName, resetToken) {
+    try {
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+      
+      const msg = {
+        to: userEmail,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject: `🔐 Reset Your Password - Kanban Collab`,
+        html: this.getPasswordResetTemplate(firstName, resetUrl),
+        text: `Hi ${firstName}, you requested to reset your password. Click this link to reset: ${resetUrl}`
+      };
+
+      await sgMail.send(msg);
+      console.log(`📧 Password reset email sent to ${userEmail}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send password reset email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send login notification email for security
+   */
+  async sendLoginNotificationEmail(userEmail, firstName, loginInfo) {
+    try {
+      const msg = {
+        to: userEmail,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject: `🔒 New Login Detected - Kanban Collab`,
+        html: this.getLoginNotificationTemplate(firstName, loginInfo),
+        text: `Hi ${firstName}, we detected a new login to your Kanban Collab account.`
+      };
+
+      await sgMail.send(msg);
+      console.log(`📧 Login notification email sent to ${userEmail}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send login notification email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send email verification email
+   */
+  async sendEmailVerificationEmail(userEmail, firstName, verificationToken) {
+    try {
+      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+      
+      const msg = {
+        to: userEmail,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject: `📧 Verify Your Email - Kanban Collab`,
+        html: this.getEmailVerificationTemplate(firstName, verificationUrl),
+        text: `Hi ${firstName}, please verify your email by clicking this link: ${verificationUrl}`
+      };
+
+      await sgMail.send(msg);
+      console.log(`📧 Email verification sent to ${userEmail}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send email verification:', error);
+      return false;
+    }
+  }
+
   // Email Templates
   getCardAssignmentTemplate(assigneeName, cardTitle, boardTitle, assignedBy) {
     return `
@@ -298,6 +402,201 @@ class EmailService {
           </div>
           <div class="footer">
             <p>This email was sent from Kanban Collab. If you have any questions, please contact your team administrator.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  getWelcomeTemplate(firstName, lastName, userEmail) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to Kanban Collab</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .account-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50; }
+          .button { display: inline-block; background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Welcome to Kanban Collab!</h1>
+          </div>
+          <div class="content">
+            <h2>Hi ${firstName}!</h2>
+            <p>Welcome to Kanban Collab! Your account has been successfully created and you're ready to start collaborating.</p>
+            
+            <div class="account-info">
+              <h3>📋 Account Details</h3>
+              <p><strong>Name:</strong> ${firstName} ${lastName}</p>
+              <p><strong>Email:</strong> ${userEmail}</p>
+              <p><strong>Account Created:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p>Click the button below to get started and create your first board:</p>
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}" class="button">Get Started</a>
+            
+            <p>Happy collaborating! 🚀</p>
+          </div>
+          <div class="footer">
+            <p>This email was sent from Kanban Collab. If you didn't create this account, please ignore this email.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  getPasswordResetTemplate(firstName, resetUrl) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Reset Your Password</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #FF5722; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .warning-box { background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FF5722; }
+          .button { display: inline-block; background: #FF5722; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 Reset Your Password</h1>
+          </div>
+          <div class="content">
+            <h2>Hi ${firstName}!</h2>
+            <p>We received a request to reset your password for your Kanban Collab account.</p>
+            
+            <div class="warning-box">
+              <p><strong>⚠️ Important:</strong> This link will expire in 1 hour for security reasons.</p>
+            </div>
+            
+            <p>Click the button below to reset your password:</p>
+            <a href="${resetUrl}" class="button">Reset Password</a>
+            
+            <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
+          </div>
+          <div class="footer">
+            <p>This email was sent from Kanban Collab. For security, this link expires in 1 hour.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  getLoginNotificationTemplate(firstName, loginInfo) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Login Detected</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #2196F3; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .login-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196F3; }
+          .security-alert { background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FF9800; }
+          .button { display: inline-block; background: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔒 New Login Detected</h1>
+          </div>
+          <div class="content">
+            <h2>Hi ${firstName}!</h2>
+            <p>We detected a new login to your Kanban Collab account.</p>
+            
+            <div class="login-info">
+              <h3>📋 Login Details</h3>
+              <p><strong>Time:</strong> ${loginInfo.time || new Date().toLocaleString()}</p>
+              <p><strong>IP Address:</strong> ${loginInfo.ipAddress || 'Unknown'}</p>
+              <p><strong>Location:</strong> ${loginInfo.location || 'Unknown'}</p>
+              <p><strong>Device:</strong> ${loginInfo.device || 'Unknown'}</p>
+            </div>
+            
+            <div class="security-alert">
+              <p><strong>⚠️ Security Alert:</strong> If this wasn't you, please change your password immediately and contact support.</p>
+            </div>
+            
+            <p>Click the button below to view your account settings:</p>
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/profile" class="button">View Account</a>
+          </div>
+          <div class="footer">
+            <p>This email was sent from Kanban Collab. If you have security concerns, please contact support immediately.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  getEmailVerificationTemplate(firstName, verificationUrl) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Verify Your Email - Kanban Collab</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #8B5CF6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .verification-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #8B5CF6; }
+          .button { display: inline-block; background: #8B5CF6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📧 Verify Your Email</h1>
+          </div>
+          <div class="content">
+            <h2>Hi ${firstName}!</h2>
+            <p>Thank you for signing up for Kanban Collab! To complete your registration, please verify your email address.</p>
+            
+            <div class="verification-info">
+              <h3>🔐 Email Verification Required</h3>
+              <p>Click the button below to verify your email address and activate your account:</p>
+            </div>
+            
+            <a href="${verificationUrl}" class="button">Verify Email Address</a>
+            
+            <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #6b7280; font-size: 14px;">${verificationUrl}</p>
+            
+            <p><strong>Note:</strong> This verification link will expire in 24 hours.</p>
+            
+            <p>Welcome to Kanban Collab! 🚀</p>
+          </div>
+          <div class="footer">
+            <p>This email was sent from Kanban Collab. If you didn't create this account, please ignore this email.</p>
           </div>
         </div>
       </body>

@@ -4,7 +4,7 @@ import { authService, User } from '../services/authService';
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, firstName: string, lastName?: string) => Promise<void>;
+  signup: (email: string, password: string, firstName: string, lastName?: string) => Promise<any>;
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -51,13 +51,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signup = async (email: string, password: string, firstName: string, lastName?: string) => {
-    const { user: userData } = await authService.signup({ 
+    const response = await authService.signup({ 
       email, 
       password, 
       first_name: firstName, 
       last_name: lastName 
     });
-    setUser(userData);
+    // Note: signup no longer automatically logs in due to email verification
+    // User will need to verify email first
+    return response;
   };
 
   const logout = () => {

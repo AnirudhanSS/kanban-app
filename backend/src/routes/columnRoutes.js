@@ -6,6 +6,7 @@ const auth = require('../middlewares/authMiddleware');
 
 router.post('/', auth, columnController.createColumn);
 router.put('/:id', auth, columnController.updateColumn);
+router.post('/reorder', auth, columnController.reorderColumns);
 router.delete('/:id', auth, columnController.deleteColumn);
 
 

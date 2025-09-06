@@ -16,6 +16,7 @@ const darkTheme = {
     text_tertiary: '#939393',
     placeholder: '#BBBBBB',
     background: '#1B1B1B',
+    background_secondary: '#3A3A3A',
     components_background: '#2E2E2E',
     border: '#434343',
     switch: '#505050',

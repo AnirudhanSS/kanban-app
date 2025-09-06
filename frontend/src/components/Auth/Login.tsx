@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Container = styled.div`
@@ -62,7 +63,30 @@ const Error = styled.div`
   text-align: center;
 `;
 
-const Link = styled.a`
+const Success = styled.div`
+  color: #27ae60;
+  margin-bottom: 1rem;
+  text-align: center;
+  padding: 10px;
+  background: #d5f4e6;
+  border-radius: 5px;
+  border: 1px solid #27ae60;
+`;
+
+const LinkStyled = styled(Link)`
+  color: #667eea;
+  text-decoration: none;
+  cursor: pointer;
+  display: block;
+  text-align: center;
+  margin-top: 0.5rem;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
+const ToggleLink = styled.a`
   color: #667eea;
   text-decoration: none;
   cursor: pointer;
@@ -79,6 +103,7 @@ const Login: React.FC = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const { login, signup } = useAuth();
@@ -90,7 +115,14 @@ const Login: React.FC = () => {
 
     try {
       if (isSignup) {
-        await signup(email, password, firstName, lastName);
+        const response = await signup(email, password, firstName, lastName);
+        setMessage(response.message || 'Account created successfully! Please check your email to verify your account.');
+        // Clear form after successful signup
+        setEmail('');
+        setPassword('');
+        setFirstName('');
+        setLastName('');
+        setIsSignup(false);
       } else {
         await login(email, password);
       }
@@ -106,6 +138,7 @@ const Login: React.FC = () => {
       <Form onSubmit={handleSubmit}>
         <Title>{isSignup ? 'Sign Up' : 'Login'}</Title>
         
+        {message && <Success>{message}</Success>}
         {error && <Error>{error}</Error>}
         
         {isSignup && (
@@ -146,10 +179,16 @@ const Login: React.FC = () => {
           {isLoading ? 'Loading...' : (isSignup ? 'Sign Up' : 'Login')}
         </Button>
         
-        <div style={{ textAlign: 'center' }}>
-          <Link onClick={() => setIsSignup(!isSignup)}>
+        {!isSignup && (
+          <LinkStyled to="/forgot-password">
+            Forgot your password?
+          </LinkStyled>
+        )}
+        
+        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+          <ToggleLink onClick={() => setIsSignup(!isSignup)}>
             {isSignup ? 'Already have an account? Login' : "Don't have an account? Sign up"}
-          </Link>
+          </ToggleLink>
         </div>
       </Form>
     </Container>

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Droppable } from '@hello-pangea/dnd';
+import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { Card } from '../../services/cardService';
 import CardComponent from '../Card';
 import Modal from '../Modal';
-import { CardsList, Container, ColumnHeader, AddCardButton } from './styles';
+import { CardsList, Container, ColumnHeader, AddCardButton, DragHandle } from './styles';
 
 interface ColumnProps {
   id: string;
@@ -13,6 +13,13 @@ interface ColumnProps {
   onCreateCard?: (cardData: any) => void;
   onUpdateCard?: (cardId: string, updates: any) => void;
   onDeleteCard?: (cardId: string) => void;
+  // Visual feedback props
+  editingCards?: Map<string, { userId: string; userName: string; field?: string }>;
+  movingCards?: Map<string, { userId: string; userName: string }>;
+  currentUserId?: string;
+  boardId?: string;
+  // Column reordering props
+  index: number;
 }
 
 const Column: React.FC<ColumnProps> = ({ 
@@ -22,7 +29,12 @@ const Column: React.FC<ColumnProps> = ({
   userRole = 'viewer',
   onCreateCard, 
   onUpdateCard, 
-  onDeleteCard 
+  onDeleteCard,
+  editingCards,
+  movingCards,
+  currentUserId,
+  boardId,
+  index
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -49,50 +61,70 @@ const Column: React.FC<ColumnProps> = ({
   };
 
   return (
-    <>
-      <Container>
-        <ColumnHeader>
-          <h2>{title}</h2>
-          <span>{cards.length}</span>
-        </ColumnHeader>
+    <Draggable draggableId={id} index={index}>
+      {(provided, snapshot) => (
+        <>
+          <Container
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            style={{
+              ...provided.draggableProps.style,
+              opacity: snapshot.isDragging ? 0.8 : 1,
+            }}
+          >
+            <ColumnHeader>
+              <DragHandle {...provided.dragHandleProps}>
+                ⋮⋮
+              </DragHandle>
+              <h2>{title}</h2>
+              <span>{cards.length}</span>
+            </ColumnHeader>
         
-        <Droppable droppableId={id}>
-          {(provided) => (
-            <CardsList ref={provided.innerRef} {...provided.droppableProps}>
-              {cards
-                .sort((a, b) => a.position - b.position)
-                .map((card, index) => (
-                  <CardComponent 
-                    key={card.id} 
-                    card={card} 
-                    index={index}
-                    userRole={userRole}
-                    onUpdate={handleUpdateCard}
-                    onDelete={handleDeleteCard}
-                  />
-                ))
-              }
-              {provided.placeholder}
-            </CardsList>
-          )}
-        </Droppable>
+            <Droppable droppableId={id}>
+              {(provided) => (
+                <CardsList ref={provided.innerRef} {...provided.droppableProps}>
+                  {cards
+                    .sort((a, b) => a.position - b.position)
+                    .map((card, index) => (
+                      <CardComponent 
+                        key={card.id} 
+                        card={card} 
+                        index={index}
+                        userRole={userRole}
+                        onUpdate={handleUpdateCard}
+                        onDelete={handleDeleteCard}
+                        isBeingEdited={editingCards?.has(card.id) || false}
+                        isBeingMoved={movingCards?.has(card.id) || false}
+                        editingUser={editingCards?.get(card.id)?.userName}
+                        movingUser={movingCards?.get(card.id)?.userName}
+                        currentUserId={currentUserId}
+                        boardId={boardId}
+                      />
+                    ))
+                  }
+                  {provided.placeholder}
+                </CardsList>
+              )}
+            </Droppable>
         
-        {(userRole === 'editor' || userRole === 'admin' || userRole === 'owner') && (
-          <AddCardButton onClick={() => setShowCreateModal(true)}>
-            + Add a card
-          </AddCardButton>
-        )}
-      </Container>
+            {(userRole === 'editor' || userRole === 'admin' || userRole === 'owner') && (
+              <AddCardButton onClick={() => setShowCreateModal(true)}>
+                + Add a card
+              </AddCardButton>
+            )}
+          </Container>
 
-      {showCreateModal && (
-        <Modal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={handleCreateCard}
-          title="Create New Card"
-        />
+          {showCreateModal && (
+            <Modal
+              isOpen={showCreateModal}
+              onClose={() => setShowCreateModal(false)}
+              onSubmit={handleCreateCard}
+              title="Create New Card"
+            />
+          )}
+        </>
       )}
-    </>
+    </Draggable>
   );
 };
 

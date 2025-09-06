@@ -16,6 +16,7 @@ const lightTheme = {
     text_tertiary: '#939393',
     placeholder: '#BBBBBB',
     background: '#F7F5F4',
+    background_secondary: '#F0F0F0',
     components_background: '#FFFFFF',
     border: '#D8D8D8',
     switch: '#EB622F',

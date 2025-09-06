@@ -5,6 +5,16 @@ class SocketService {
   private token: string | null = null;
 
   connect(token: string) {
+    // Don't reconnect if already connected with the same token
+    if (this.socket && this.socket.connected && this.token === token) {
+      return this.socket;
+    }
+    
+    // Disconnect existing socket if token changed
+    if (this.socket) {
+      this.socket.disconnect();
+    }
+    
     this.token = token;
     this.socket = io(process.env.REACT_APP_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : ''), {
       auth: {
@@ -55,6 +65,31 @@ class SocketService {
   addComment(data: any) {
     if (this.socket) {
       this.socket.emit('addComment', data);
+    }
+  }
+
+  // Visual feedback methods
+  startCardEdit(cardId: string, boardId: string, field?: string) {
+    if (this.socket) {
+      this.socket.emit('card:edit_start', { cardId, boardId, field });
+    }
+  }
+
+  endCardEdit(cardId: string, boardId: string) {
+    if (this.socket) {
+      this.socket.emit('card:edit_end', { cardId, boardId });
+    }
+  }
+
+  startCardMove(cardId: string, boardId: string) {
+    if (this.socket) {
+      this.socket.emit('card:move_start', { cardId, boardId });
+    }
+  }
+
+  endCardMove(cardId: string, boardId: string) {
+    if (this.socket) {
+      this.socket.emit('card:move_end', { cardId, boardId });
     }
   }
 
@@ -146,6 +181,31 @@ class SocketService {
     }
   }
 
+  // Visual feedback event listeners
+  onCardEditStart(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('card:edit_start', callback);
+    }
+  }
+
+  onCardEditEnd(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('card:edit_end', callback);
+    }
+  }
+
+  onCardMoveStart(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('card:move_start', callback);
+    }
+  }
+
+  onCardMoveEnd(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('card:move_end', callback);
+    }
+  }
+
   off(event: string) {
     if (this.socket) {
       this.socket.off(event);
@@ -154,6 +214,10 @@ class SocketService {
 
   getSocket() {
     return this.socket;
+  }
+
+  isConnected() {
+    return this.socket && this.socket.connected;
   }
 }
 
