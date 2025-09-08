@@ -98,16 +98,19 @@ exports.createCard = async (req, res, next) => {
         const assigner = await User.findByPk(req.user.id);
         
         if (assignee && board && assigner) {
+          console.log('📧 Sending card assignment email to:', assignee.email);
           await emailService.sendCardAssignmentEmail(
             assignee.email,
-            assignee.firstname || assignee.email,
+            assignee.first_name || assignee.email,
             title,
             board.title,
-            assigner.firstname || assigner.email
+            assigner.first_name || assigner.email
           );
+          console.log('✅ Card assignment email sent successfully');
         }
       } catch (emailError) {
-        console.error('Failed to send assignment email:', emailError);
+        console.error('❌ Failed to send assignment email:', emailError);
+        console.error('❌ Email error details:', emailError.message, emailError.stack);
         // Don't fail the request if email fails
       }
     }
@@ -219,16 +222,19 @@ exports.updateCard = async (req, res, next) => {
         const assigner = await User.findByPk(req.user.id);
         
         if (assignee && board && assigner) {
+          console.log('📧 Sending card assignment email to:', assignee.email);
           await emailService.sendCardAssignmentEmail(
             assignee.email,
-            assignee.firstname || assignee.email,
+            assignee.first_name || assignee.email,
             card.title,
             board.title,
-            assigner.firstname || assigner.email
+            assigner.first_name || assigner.email
           );
+          console.log('✅ Card assignment email sent successfully');
         }
       } catch (emailError) {
-        console.error('Failed to send assignment email:', emailError);
+        console.error('❌ Failed to send assignment email:', emailError);
+        console.error('❌ Email error details:', emailError.message, emailError.stack);
         // Don't fail the request if email fails
       }
     }

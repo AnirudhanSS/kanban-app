@@ -294,9 +294,9 @@ exports.addMember = async (req, res, next) => {
       if (user && board && inviter) {
         await emailService.sendBoardInvitationEmail(
           user.email,
-          user.firstname || user.email,
+          user.first_name || user.email,
           board.title,
-          inviter.firstname || inviter.email,
+          inviter.first_name || inviter.email,
           role
         );
       }
