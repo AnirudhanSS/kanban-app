@@ -1,5 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { ThemeContext } from 'styled-components';
+import React, { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import CloseIcon from '../../assets/close.png';
@@ -31,8 +30,7 @@ interface ModalProps{
 }
 
 const Modal: React.FC<ModalProps> = ({visible, isOpen, onClose, onSubmit, title: modalTitle, initialData}) => {
-  const { toggleVisibility, selectedCard } = useModal();
-  const theme = useContext(ThemeContext)!; 
+  const { toggleVisibility, selectedCard } = useModal(); 
 
   const [cardTitle, setCardTitle] = useState<string>(initialData?.title || selectedCard?.title || '');
   const [description, setDescription] = useState<string>(initialData?.description || selectedCard?.description || '');
