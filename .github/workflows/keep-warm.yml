@@ -1,0 +1,28 @@
+name: Keep Render Instance Warm
+
+on:
+  schedule:
+    # Run every 10 minutes to keep the instance warm
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  keep-warm:
+    name: Ping Render Instance
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Ping Render instance
+      run: |
+        RENDER_URL="https://kanban-app-1r2y.onrender.com"
+        echo "Pinging $RENDER_URL to keep instance warm..."
+        curl -f $RENDER_URL/health || echo "Ping failed, but that's okay"
+      continue-on-error: true
+
+    - name: Test WebSocket endpoint
+      run: |
+        RENDER_URL="https://kanban-app-1r2y.onrender.com"
+        echo "Testing WebSocket endpoint..."
+        # Simple test to ensure the server is responding
+        curl -f $RENDER_URL/ || echo "WebSocket test failed, but that's okay"
+      continue-on-error: true

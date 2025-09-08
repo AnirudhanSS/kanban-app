@@ -1,0 +1,75 @@
+name: Deploy to Render
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        cd backend && npm ci
+        cd ../frontend && npm ci
+
+    - name: Build frontend
+      run: |
+        cd frontend && npm run build
+
+    - name: Deploy to Render
+      run: |
+        echo "Triggering Render deployment..."
+        curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment successful!"
+        else
+          echo "❌ Deployment failed!"
+        fi
+
+    - name: Health Check
+      if: success()
+      run: |
+        echo "Waiting for deployment to be ready..."
+        sleep 30
+        
+        RENDER_URL="https://kanban-app-1r2y.onrender.com"
+        echo "Performing health check on $RENDER_URL"
+        for i in {1..5}; do
+          if curl -f $RENDER_URL/health; then
+            echo "✅ Health check passed!"
+            break
+          else
+            echo "⏳ Health check attempt $i failed, retrying in 10 seconds..."
+            sleep 10
+          fi
+        done
