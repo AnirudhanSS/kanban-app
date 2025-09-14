@@ -57,7 +57,7 @@ const BoardAdminPanel: React.FC<BoardAdminPanelProps> = ({ boardId, boardName, o
 
   useEffect(() => {
     loadData();
-  }, [boardId]);
+  }, [boardId, loadData]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-GB', {

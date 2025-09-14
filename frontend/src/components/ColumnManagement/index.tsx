@@ -132,21 +132,21 @@ const ColumnManagement: React.FC<ColumnManagementProps> = ({
     }
   };
 
-  const handleReorderColumns = async (columnIds: string[]) => {
-    setIsLoading(true);
-    try {
-      await columnService.reorderColumns(columnIds);
-      
-      // Don't update local state here - let WebSocket events handle it
-      // This ensures all users see the changes in real-time
-      showNotification('Columns reordered successfully', 'success');
-    } catch (error) {
-      console.error('Failed to reorder columns:', error);
-      showNotification('Failed to reorder columns', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // const handleReorderColumns = async (columnIds: string[]) => {
+  //   setIsLoading(true);
+  //   try {
+  //     await columnService.reorderColumns(columnIds);
+  //     
+  //     // Don't update local state here - let WebSocket events handle it
+  //     // This ensures all users see the changes in real-time
+  //     showNotification('Columns reordered successfully', 'success');
+  //   } catch (error) {
+  //     console.error('Failed to reorder columns:', error);
+  //     showNotification('Failed to reorder columns', 'error');
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   if (!isOpen) return null;
 

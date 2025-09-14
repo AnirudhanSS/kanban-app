@@ -1,20 +1,14 @@
 import React, { useState } from 'react';
 import { Comment as CommentType } from '../../services/commentService';
-import { canEditComment, canDeleteComment, UserRole } from '../../utils/permissions';
+import { canDeleteComment, UserRole } from '../../utils/permissions';
 import { 
   CommentContainer, 
   CommentHeader, 
   CommentContent, 
   CommentActions, 
-  CommentForm,
-  ReplyButton,
-  EditButton,
-  DeleteButton,
   UserName,
   CommentDate,
-  CommentText,
-  CommentInput,
-  CommentButtons
+  CommentText
 } from './styles';
 
 interface CommentProps {
@@ -43,12 +37,11 @@ const Comment: React.FC<CommentProps> = ({
   // onEditCancel
 }) => {
   // const [editContent, setEditContent] = useState(comment.content); // Disabled
-  const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState('');
 
   // const canEdit = canEditComment(userRole, comment.user_id, currentUserId || ''); // Disabled
-  const canDelete = canDeleteComment(userRole, comment.user_id, currentUserId || '');
-  const canReply = ['editor', 'admin', 'owner'].includes(userRole);
+  // const canDelete = canDeleteComment(userRole, comment.user_id, currentUserId || '');
+  // const canReply = ['editor', 'admin', 'owner'].includes(userRole);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -73,19 +66,19 @@ const Comment: React.FC<CommentProps> = ({
   //   }
   // };
 
-  const handleDelete = () => {
-    if (onDelete && window.confirm('Are you sure you want to delete this comment?')) {
-      onDelete(comment.id);
-    }
-  };
+  // const handleDelete = () => {
+  //   if (onDelete && window.confirm('Are you sure you want to delete this comment?')) {
+  //     onDelete(comment.id);
+  //   }
+  // };
 
-  const handleReply = () => {
-    if (onReply && replyContent.trim()) {
-      onReply(comment.id);
-      setReplyContent('');
-      setShowReplyForm(false);
-    }
-  };
+  // const handleReply = () => {
+  //   if (onReply && replyContent.trim()) {
+  //     onReply(comment.id);
+  //     setReplyContent('');
+  //     setShowReplyForm(false);
+  //   }
+  // };
 
   const getUserDisplayName = () => {
     if (comment.User) {
