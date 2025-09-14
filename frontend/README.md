@@ -1,46 +1,225 @@
-# Getting Started with Create React App
+# 🚀 Collaborative Kanban Board
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A real-time collaborative Kanban board application built with React, Node.js, and WebSockets. Multiple users can work together on boards with live updates, presence indicators, and notifications.
 
-## Available Scripts
+## ✨ Features
 
-In the project directory, you can run:
+### Core Features
+- **📋 Board Management**: Create, edit, and manage Kanban boards with customizable columns
+- **🎯 Card CRUD**: Create, update, delete, and assign cards with due dates and labels
+- **🔄 Real-Time Collaboration**: Live updates across all connected users via WebSockets
+- **👥 Presence Tracking**: See who's online and working on the board
+- **🔔 Notifications**: In-app notifications for card assignments and mentions
+- **📝 Audit Log**: Complete history of all board changes and events
+- **🎨 Drag & Drop**: Smooth drag-and-drop functionality for cards and columns
 
-### `npm start`
+### Advanced Features
+- **🔐 User Authentication**: Secure JWT-based authentication system
+- **👤 User Management**: Profile management and board member roles
+- **🔍 Search & Filter**: Find cards and boards quickly
+- **🌙 Dark/Light Theme**: Toggle between themes
+- **📱 Responsive Design**: Works on desktop, tablet, and mobile
+- **⚡ Optimistic UI**: Instant feedback with conflict resolution
+- **🛡️ Security**: Rate limiting, input validation, and secure headers
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## 🛠️ Tech Stack
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### Frontend
+- **React 19** with TypeScript
+- **Redux Toolkit** for state management
+- **Styled Components** for styling
+- **Socket.io Client** for real-time communication
+- **React Beautiful DnD** for drag-and-drop
 
-### `npm test`
+### Backend
+- **Node.js** with Express
+- **Socket.io** for WebSocket connections
+- **Sequelize** ORM with PostgreSQL
+- **JWT** for authentication
+- **Redis** for presence tracking and caching
+- **SendGrid** for email notifications
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Infrastructure
+- **Docker** for containerization
+- **GitHub Actions** for CI/CD
+- **Render.com** for hosting
+- **Supabase** for PostgreSQL database
+- **Upstash** for Redis
 
-### `npm run build`
+## 🚀 Quick Start
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Prerequisites
+- Node.js 20+
+- Docker (optional)
+- Git
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Local Development
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/AnirudhanSS/kanban-app.git
+   cd kanban-app
+   ```
 
-### `npm run eject`
+2. **Install dependencies**
+   ```bash
+   # Backend
+   cd backend
+   npm install
+   
+   # Frontend
+   cd ../frontend
+   npm install
+   ```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+3. **Set up environment variables**
+   ```bash
+   # Copy the example file
+   cp backend/env.example backend/.env
+   
+   # Edit the .env file with your configuration
+   ```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+4. **Start the development servers**
+   ```bash
+   # Terminal 1 - Backend
+   cd backend
+   npm start
+   
+   # Terminal 2 - Frontend
+   cd frontend
+   npm start
+   ```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+5. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend: http://localhost:5000
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### Docker Deployment
 
-## Learn More
+1. **Build the Docker image**
+   ```bash
+   docker build -t kanban-app .
+   ```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+2. **Run the container**
+   ```bash
+   docker run -p 5000:5000 --env-file backend/.env kanban-app
+   ```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 📊 Environment Variables
+
+### Required Variables
+```env
+# Database
+DB_HOST=your-supabase-host
+DB_PORT=5432
+DB_NAME=your-database-name
+DB_USER=your-username
+DB_PASSWORD=your-password
+
+# Redis
+REDIS_URL=your-upstash-redis-url
+
+# JWT
+JWT_SECRET=your-jwt-secret
+JWT_EXPIRES_IN=7d
+
+# Email
+SENDGRID_API_KEY=your-sendgrid-api-key
+FROM_EMAIL=your-email@domain.com
+
+# Server
+PORT=5000
+NODE_ENV=production
+```
+
+## 🔧 API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/me` - Get current user
+
+### Boards
+- `GET /api/boards` - Get user's boards
+- `POST /api/boards` - Create new board
+- `GET /api/boards/:id` - Get board details
+- `PUT /api/boards/:id` - Update board
+- `DELETE /api/boards/:id` - Delete board
+
+### Cards
+- `GET /api/boards/:boardId/cards` - Get board cards
+- `POST /api/boards/:boardId/cards` - Create new card
+- `PUT /api/cards/:id` - Update card
+- `DELETE /api/cards/:id` - Delete card
+
+### WebSocket Events
+- `join-board` - Join a board room
+- `leave-board` - Leave a board room
+- `card-created` - Card created event
+- `card-updated` - Card updated event
+- `card-moved` - Card moved event
+- `card-deleted` - Card deleted event
+
+## 🧪 Testing
+
+### Run Tests
+```bash
+# Backend tests
+cd backend
+npm test
+
+# Frontend tests
+cd frontend
+npm test
+```
+
+### Health Check
+```bash
+curl http://localhost:5000/health
+```
+
+## 🚀 Deployment
+
+### GitHub Actions CI/CD
+The project includes automated CI/CD pipelines:
+
+- **CI Pipeline**: Runs on every push/PR
+  - Builds and tests the application
+  - Security scanning
+  - Docker image building
+  - Code quality checks
+
+- **Deploy Pipeline**: Runs on main branch pushes
+  - Deploys to Render.com
+  - Health checks
+  - Keeps instance warm
+
+### Manual Deployment to Render
+
+1. **Connect GitHub repository** to Render
+2. **Set environment variables** in Render dashboard
+3. **Use the provided Dockerfile**
+4. **Deploy automatically** on git push
+
+## 📈 Performance Features
+
+- **Optimistic UI Updates**: Instant feedback with server reconciliation
+- **Connection Recovery**: Automatic reconnection on network issues
+- **Presence Tracking**: Real-time user presence with Redis
+- **Rate Limiting**: Prevents abuse and spam
+- **Caching**: Redis caching for improved performance
+- **Compression**: Gzip compression for faster loading
+
+## 🔒 Security Features
+
+- **JWT Authentication**: Secure token-based authentication
+- **Input Validation**: Comprehensive input sanitization
+- **Rate Limiting**: API rate limiting to prevent abuse
+- **CORS Configuration**: Proper cross-origin resource sharing
+- **Security Headers**: Helmet.js for security headers
+- **Password Hashing**: bcrypt for secure password storage
+---
+
