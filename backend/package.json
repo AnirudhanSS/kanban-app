@@ -4,6 +4,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "test": "echo \"Backend tests not implemented yet\" && exit 0",
     "sync": "node src/db/syncTables.js",
     "warmup": "node ../scripts/warmup.js"
   },
