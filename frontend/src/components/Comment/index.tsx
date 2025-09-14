@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Comment as CommentType } from '../../services/commentService';
-import { canDeleteComment, UserRole } from '../../utils/permissions';
+import { UserRole } from '../../utils/permissions';
 import { 
   CommentContainer, 
   CommentHeader, 
@@ -37,7 +37,7 @@ const Comment: React.FC<CommentProps> = ({
   // onEditCancel
 }) => {
   // const [editContent, setEditContent] = useState(comment.content); // Disabled
-  const [replyContent, setReplyContent] = useState('');
+  // const [replyContent, setReplyContent] = useState('');
 
   // const canEdit = canEditComment(userRole, comment.user_id, currentUserId || ''); // Disabled
   // const canDelete = canDeleteComment(userRole, comment.user_id, currentUserId || '');

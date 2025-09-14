@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { boardAdminService, BoardMember, BoardAuditLog, BoardStats } from '../../services/boardAdminService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { 
@@ -33,7 +33,7 @@ const BoardAdminPanel: React.FC<BoardAdminPanelProps> = ({ boardId, boardName, o
   const [error, setError] = useState<string | null>(null);
   const { showNotification } = useNotification();
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -53,7 +53,7 @@ const BoardAdminPanel: React.FC<BoardAdminPanelProps> = ({ boardId, boardName, o
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [boardId, showNotification]);
 
   useEffect(() => {
     loadData();
