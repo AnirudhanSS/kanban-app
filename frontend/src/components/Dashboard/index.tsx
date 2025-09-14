@@ -37,6 +37,7 @@ const Dashboard: React.FC<DashboardProps> = ({ toggleTheme, onViewBoard }) => {
     myBoards: 0,
     sharedBoards: 0
   });
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadBoards();
@@ -80,16 +81,44 @@ const Dashboard: React.FC<DashboardProps> = ({ toggleTheme, onViewBoard }) => {
     });
   }, [boards, user?.id]);
 
+  const handleBoardUpdated = useCallback((updatedBoard: Board) => {
+    setBoards(prev => prev.map(board => 
+      board.id === updatedBoard.id ? updatedBoard : board
+    ));
+  }, []);
+
+  const handleBoardDeleted = useCallback((data: { boardId: string }) => {
+    setBoards(prev => prev.filter(board => board.id !== data.boardId));
+    // Recalculate stats
+    const remainingBoards = boards.filter(board => board.id !== data.boardId);
+    const myBoards = remainingBoards.filter(board => board.owner_id === user?.id);
+    const sharedBoards = remainingBoards.filter(board => board.owner_id !== user?.id);
+    setStats({
+      totalBoards: remainingBoards.length,
+      myBoards: myBoards.length,
+      sharedBoards: sharedBoards.length
+    });
+  }, [boards, user?.id]);
+
+  // Wrapper function for BoardCard component (expects string, not object)
+  const handleBoardDeletedForCard = useCallback((boardId: string) => {
+    handleBoardDeleted({ boardId });
+  }, [handleBoardDeleted]);
+
   useEffect(() => {
     if (socket && user) {
-      // Listen for board creation events
+      // Listen for board events
       socket.on('boardCreated', handleBoardCreated);
+      socket.on('boardUpdated', handleBoardUpdated);
+      socket.on('boardDeleted', handleBoardDeleted);
       
       return () => {
         socket.off('boardCreated', handleBoardCreated);
+        socket.off('boardUpdated', handleBoardUpdated);
+        socket.off('boardDeleted', handleBoardDeleted);
       };
     }
-  }, [socket, user, handleBoardCreated]);
+  }, [socket, user, handleBoardCreated, handleBoardUpdated, handleBoardDeleted]);
 
   const handleJoinBoard = () => {
     setShowJoinModal(true);
@@ -107,27 +136,14 @@ const Dashboard: React.FC<DashboardProps> = ({ toggleTheme, onViewBoard }) => {
     });
   };
 
-  const handleBoardUpdated = (updatedBoard: Board) => {
-    setBoards(prev => prev.map(board => 
-      board.id === updatedBoard.id ? updatedBoard : board
-    ));
-  };
 
-  const handleBoardDeleted = (boardId: string) => {
-    setBoards(prev => prev.filter(board => board.id !== boardId));
-    // Recalculate stats
-    const remainingBoards = boards.filter(board => board.id !== boardId);
-    const myBoards = remainingBoards.filter(board => board.owner_id === user?.id);
-    const sharedBoards = remainingBoards.filter(board => board.owner_id !== user?.id);
-    setStats({
-      totalBoards: remainingBoards.length,
-      myBoards: myBoards.length,
-      sharedBoards: sharedBoards.length
-    });
-  };
-
-  const myBoards = boards.filter(board => board.owner_id === user?.id);
-  const sharedBoards = boards.filter(board => board.owner_id !== user?.id);
+  // Filter boards based on search query
+  const filteredBoards = boards.filter(board => 
+    board.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const myBoards = filteredBoards.filter(board => board.owner_id === user?.id);
+  const sharedBoards = filteredBoards.filter(board => board.owner_id !== user?.id);
 
   return (
     <Container>
@@ -153,6 +169,86 @@ const Dashboard: React.FC<DashboardProps> = ({ toggleTheme, onViewBoard }) => {
         </StatCard>
       </StatsContainer>
 
+      {/* Search Box */}
+      <div style={{ 
+        margin: '2rem 0', 
+        display: 'flex', 
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: '1rem'
+      }}>
+        <div style={{ 
+          position: 'relative',
+          width: '100%',
+          maxWidth: '500px'
+        }}>
+          <input
+            type="text"
+            placeholder="Search boards by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem 1rem 0.75rem 2.5rem',
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              outline: 'none',
+              transition: 'border-color 0.2s ease',
+              backgroundColor: theme?.colors?.background || '#ffffff',
+              color: theme?.colors?.text || '#333333'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#EB622F';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#e0e0e0';
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            left: '0.75rem',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: '#999',
+            fontSize: '1.1rem'
+          }}>
+            🔍
+          </div>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: '#999',
+                cursor: 'pointer',
+                fontSize: '1.2rem',
+                padding: '0.25rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '24px',
+                height: '24px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f0f0f0';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
       <QuickActions>
         <ActionButton onClick={handleCreateBoard}>
           + Create New Board
@@ -169,7 +265,19 @@ const Dashboard: React.FC<DashboardProps> = ({ toggleTheme, onViewBoard }) => {
       </QuickActions>
 
       <BoardsSection>
-        <SectionTitle>My Boards</SectionTitle>
+        <SectionTitle>
+          My Boards
+          {searchQuery && (
+            <span style={{ 
+              fontSize: '0.9rem', 
+              fontWeight: 'normal', 
+              color: '#666',
+              marginLeft: '0.5rem'
+            }}>
+              ({myBoards.length} found)
+            </span>
+          )}
+        </SectionTitle>
         <BoardsGrid>
           {isLoading ? (
             <p>Loading boards...</p>
@@ -179,11 +287,14 @@ const Dashboard: React.FC<DashboardProps> = ({ toggleTheme, onViewBoard }) => {
                 key={board.id} 
                 board={board} 
                 isOwner={true} 
+                userRole={board.userRole}
                 onViewBoard={onViewBoard}
                 onBoardUpdated={handleBoardUpdated}
-                onBoardDeleted={handleBoardDeleted}
+                onBoardDeleted={handleBoardDeletedForCard}
               />
             ))
+          ) : searchQuery ? (
+            <p>No boards found matching "{searchQuery}"</p>
           ) : (
             <p>No boards yet. Create your first board!</p>
           )}
@@ -192,16 +303,29 @@ const Dashboard: React.FC<DashboardProps> = ({ toggleTheme, onViewBoard }) => {
 
       {sharedBoards.length > 0 && (
         <BoardsSection>
-          <SectionTitle>Shared Boards</SectionTitle>
+          <SectionTitle>
+            Shared Boards
+            {searchQuery && (
+              <span style={{ 
+                fontSize: '0.9rem', 
+                fontWeight: 'normal', 
+                color: '#666',
+                marginLeft: '0.5rem'
+              }}>
+                ({sharedBoards.length} found)
+              </span>
+            )}
+          </SectionTitle>
           <BoardsGrid>
             {sharedBoards.map(board => (
               <BoardCard 
                 key={board.id} 
                 board={board} 
                 isOwner={false} 
+                userRole={board.userRole}
                 onViewBoard={onViewBoard}
                 onBoardUpdated={handleBoardUpdated}
-                onBoardDeleted={handleBoardDeleted}
+                onBoardDeleted={handleBoardDeletedForCard}
               />
             ))}
           </BoardsGrid>

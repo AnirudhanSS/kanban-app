@@ -128,10 +128,10 @@ exports.createCard = async (req, res, next) => {
         if (assignee && board && assigner) {
           await emailService.sendCardAssignmentEmail(
             assignee.email,
-            assignee.firstname || assignee.email,
+            assignee.first_name || assignee.email,
             title,
             board.title,
-            assigner.firstname || assigner.email
+            assigner.first_name || assigner.email
           );
         }
       } catch (emailError) {
@@ -209,8 +209,13 @@ exports.updateCard = async (req, res, next) => {
       return res.status(409).json({ error: 'Card was updated by someone else. Refresh and retry.' });
     }
 
+    // Only acquire lock for content updates, not for position-only updates
+    // Position updates use timestamp-based positioning and can happen concurrently
     let lockAcquired = true;
-    if (req.socketId) {
+    const isPositionOnlyUpdate = (title === undefined && description === undefined && assignee_id === undefined) && 
+                                 (position !== undefined || column_id !== undefined);
+    
+    if (req.socketId && !isPositionOnlyUpdate) {
       lockAcquired = await acquireLock(card.id, req.socketId);
       if (!lockAcquired) return res.status(423).json({ error: 'Card is being updated by someone else. Try again.' });
     }
@@ -267,10 +272,10 @@ exports.updateCard = async (req, res, next) => {
         if (assignee && board && assigner) {
           await emailService.sendCardAssignmentEmail(
             assignee.email,
-            assignee.firstname || assignee.email,
+            assignee.first_name || assignee.email,
             card.title,
             board.title,
-            assigner.firstname || assigner.email
+            assigner.first_name || assigner.email
           );
         }
       } catch (emailError) {
@@ -280,7 +285,7 @@ exports.updateCard = async (req, res, next) => {
     }
 
     await t.commit();
-    if (req.socketId) {
+    if (req.socketId && !isPositionOnlyUpdate) {
       await releaseLock(card.id, req.socketId);
     }
 
@@ -288,6 +293,15 @@ exports.updateCard = async (req, res, next) => {
       const eventName = column_id && column_id !== old_values.column_id ? 'cardMoved' : 'cardUpdated';
       console.log(`🔄 Emitting ${eventName} event to board:${column.board_id}:`, card.toJSON());
       req.io.to(`board:${column.board_id}`).emit(eventName, card);
+      
+      // Also emit the card:moved event for consistency
+      if (eventName === 'cardMoved') {
+        req.io.to(`board:${column.board_id}`).emit('card:moved', {
+          cardId: card.id,
+          newColumnId: card.column_id,
+          newPosition: card.position
+        });
+      }
     }
 
     res.json(card);
@@ -295,7 +309,7 @@ exports.updateCard = async (req, res, next) => {
     if (!t.finished) {
       await t.rollback();
     }
-    if (req.socketId) {
+    if (req.socketId && !isPositionOnlyUpdate) {
       await releaseLock(req.params.id, req.socketId);
     }
     

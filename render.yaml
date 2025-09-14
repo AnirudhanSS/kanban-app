@@ -1,0 +1,59 @@
+services:
+  - type: web
+    name: kanban-collab
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DB_NAME
+        fromDatabase:
+          name: kanban-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: kanban-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: kanban-db
+          property: password
+      - key: DB_HOST
+        fromDatabase:
+          name: kanban-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: kanban-db
+          property: port
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: kanban-redis
+          property: connectionString
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM_EMAIL
+        value: noreply@kanban-collab.com
+      - key: SENDGRID_FROM_NAME
+        value: Kanban Collab
+      - key: FRONTEND_URL
+        value: https://kanban-collab.onrender.com
+      - key: JWT_SECRET
+        generateValue: true
+
+databases:
+  - name: kanban-db
+    plan: free
+    databaseName: kanban
+    user: kanban_user
+
+  - name: kanban-redis
+    type: redis
+    plan: free

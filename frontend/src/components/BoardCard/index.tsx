@@ -17,6 +17,7 @@ import {
 interface BoardCardProps {
   board: Board;
   isOwner?: boolean;
+  userRole?: string;
   onViewBoard?: (boardId: string) => void;
   onBoardUpdated?: (updatedBoard: Board) => void;
   onBoardDeleted?: (boardId: string) => void;
@@ -25,6 +26,7 @@ interface BoardCardProps {
 const BoardCard: React.FC<BoardCardProps> = ({ 
   board, 
   isOwner, 
+  userRole,
   onViewBoard, 
   onBoardUpdated, 
   onBoardDeleted 
@@ -96,13 +98,42 @@ const BoardCard: React.FC<BoardCardProps> = ({
     }
   };
 
+  const getRoleBadgeStyle = (role: string) => {
+    const baseStyle = {
+      padding: '0.25rem 0.5rem',
+      borderRadius: '4px',
+      fontSize: '0.75rem',
+      fontWeight: 'bold',
+      textTransform: 'uppercase' as const,
+      color: 'white'
+    };
+
+    switch (role) {
+      case 'admin':
+        return { ...baseStyle, backgroundColor: '#ff9800' };
+      case 'editor':
+        return { ...baseStyle, backgroundColor: '#2196f3' };
+      case 'viewer':
+        return { ...baseStyle, backgroundColor: '#9e9e9e' };
+      default:
+        return { ...baseStyle, backgroundColor: '#9e9e9e' };
+    }
+  };
+
   return (
     <>
     <CardContainer>
       <CardHeader>
         <CardTitle>{board.title}</CardTitle>
-        {isOwner && <OwnerBadge>Owner</OwnerBadge>}
-        {board.is_public && <PublicBadge>Public</PublicBadge>}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {isOwner && <OwnerBadge>Owner</OwnerBadge>}
+          {!isOwner && userRole && (
+            <span style={getRoleBadgeStyle(userRole)}>
+              {userRole}
+            </span>
+          )}
+          {board.is_public && <PublicBadge>Public</PublicBadge>}
+        </div>
       </CardHeader>
       
       {board.description && (

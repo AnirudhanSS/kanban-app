@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { Link } from 'react-router-dom';
 
 export const HeaderContainer = styled.header`
   display: flex;
@@ -75,4 +76,19 @@ export const ThemeToggle = styled.button`
 export const ToggleIcon = styled.img`
   width: 20px;
   height: 20px;
+`;
+
+export const AdminLink = styled(Link)`
+  color: ${({ theme }) => theme.colors.text};
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.primary}20;
+    color: ${({ theme }) => theme.colors.primary};
+  }
 `;

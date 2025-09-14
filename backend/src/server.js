@@ -233,6 +233,8 @@ async function handleAddComment(socket, data) {
     // Mentions
     const mentionRegex = /@([a-zA-Z0-9._-]+)/g;
     let match;
+    const mentionedUsers = new Set();
+    
     while ((match = mentionRegex.exec(content)) !== null) {
       const username = match[1].toLowerCase();
       const mentionedUser = await User.findOne({ where: { username } });
@@ -241,12 +243,39 @@ async function handleAddComment(socket, data) {
       const isMember = await BoardMember.findOne({ where: { user_id: mentionedUser.id, board_id: boardId } });
       if (!isMember) continue;
 
-      socket.to(`user:${mentionedUser.id}`).emit("mention:added", {
-        commentId: comment.id,
-        cardId,
-        fromUserId: socket.user.id,
-        content
-      });
+      mentionedUsers.add(mentionedUser);
+    }
+
+    // Send email notifications for mentions
+    for (const mentionedUser of mentionedUsers) {
+      try {
+        const commenter = await User.findByPk(socket.user.id);
+        if (commenter && mentionedUser.id !== socket.user.id) {
+          await require('./services/emailService').sendMentionEmail(
+            mentionedUser.email,
+            mentionedUser.first_name || mentionedUser.email,
+            card.title || 'Untitled Card',
+            column.title || 'Board',
+            commenter.first_name || commenter.email,
+            content
+          );
+        }
+      } catch (emailError) {
+        console.error('Failed to send mention email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    // Emit mention notifications
+    for (const mentionedUser of mentionedUsers) {
+      if (mentionedUser.id !== socket.user.id) {
+        socket.to(`user:${mentionedUser.id}`).emit("mention:added", {
+          commentId: comment.id,
+          cardId,
+          fromUserId: socket.user.id,
+          content
+        });
+      }
     }
 
     socket.to(`board:${boardId}`).emit("comment:added", comment);

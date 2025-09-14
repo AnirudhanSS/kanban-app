@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { boardService, CreateBoardData } from '../../services/boardService';
+import { columnService } from '../../services/columnService';
+import { cardService } from '../../services/cardService';
+import { BoardTemplate } from '../../services/boardTemplateService';
 import { useNotification } from '../../contexts/NotificationContext';
-import { Container, Content, CloseButton, Title, Form, Input, MultilineInput, Button, ButtonGroup, ColorPicker, ColorOption, ToggleContainer, ToggleLabel, ToggleSwitch } from './styles';
+import BoardTemplateSelector from '../BoardTemplateSelector';
+import { Container, Content, CloseButton, Title, Form, Input, MultilineInput, Button, ButtonGroup, ColorPicker, ColorOption, ToggleContainer, ToggleLabel, ToggleSwitch, TemplateSection } from './styles';
 
 interface CreateBoardModalProps {
   isOpen: boolean;
@@ -18,6 +22,8 @@ const CreateBoardModal: React.FC<CreateBoardModalProps> = ({ isOpen, onClose, on
     is_public: false
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<BoardTemplate | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const colors = [
     '#EB622F', '#4CAF50', '#2196F3', '#9C27B0', 
@@ -37,6 +43,16 @@ const CreateBoardModal: React.FC<CreateBoardModalProps> = ({ isOpen, onClose, on
     setFormData(prev => ({ ...prev, is_public: e.target.checked }));
   };
 
+  const handleTemplateSelect = (template: BoardTemplate) => {
+    setSelectedTemplate(template);
+    setFormData(prev => ({
+      ...prev,
+      title: template.name,
+      description: template.description
+    }));
+    setShowTemplates(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
@@ -45,8 +61,39 @@ const CreateBoardModal: React.FC<CreateBoardModalProps> = ({ isOpen, onClose, on
     try {
       const newBoard = await boardService.createBoard({
         ...formData,
-        title: formData.title.trim()
+        title: formData.title.trim(),
+        skip_default_columns: !!selectedTemplate // Skip default columns if using a template
       });
+      
+      // If a template is selected, create columns and cards
+      if (selectedTemplate) {
+        // Create columns
+        for (const column of selectedTemplate.columns) {
+          await columnService.createColumn(newBoard.id, {
+            title: column.title,
+            position: column.position
+          });
+        }
+
+        // Create cards if any
+        if (selectedTemplate.cards && selectedTemplate.cards.length > 0) {
+          // Get the created columns to map cards to them
+          const boardData = await boardService.getBoard(newBoard.id);
+          const columns = boardData.Columns || [];
+
+          for (const card of selectedTemplate.cards) {
+            const column = columns.find((col: any) => col.title === card.columnTitle);
+            if (column) {
+              await cardService.createCard({
+                title: card.title,
+                description: card.description,
+                column_id: column.id,
+                priority: card.priority as 'low' | 'medium' | 'high' | 'urgent' | undefined
+              });
+            }
+          }
+        }
+      }
       
       onBoardCreated(newBoard);
       showNotification('Board created successfully', 'success');
@@ -59,6 +106,7 @@ const CreateBoardModal: React.FC<CreateBoardModalProps> = ({ isOpen, onClose, on
         background_color: '#EB622F',
         is_public: false
       });
+      setSelectedTemplate(null);
     } catch (err: any) {
       console.error('Failed to create board:', err);
       showNotification('Failed to create board', 'error');
@@ -88,6 +136,22 @@ const CreateBoardModal: React.FC<CreateBoardModalProps> = ({ isOpen, onClose, on
         <Title>Create New Board</Title>
         
         <Form onSubmit={handleSubmit}>
+          <TemplateSection>
+            <Button 
+              type="button" 
+              onClick={() => setShowTemplates(!showTemplates)}
+              $secondary
+            >
+              {selectedTemplate ? `Template: ${selectedTemplate.name}` : 'Choose Template (Optional)'}
+            </Button>
+            
+            {showTemplates && (
+              <BoardTemplateSelector
+                onSelectTemplate={handleTemplateSelect}
+              />
+            )}
+          </TemplateSection>
+
           <Input
             type="text"
             name="title"

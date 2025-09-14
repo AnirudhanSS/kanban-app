@@ -30,9 +30,15 @@ export const authService = {
   },
 
   async signup(data: SignupData) {
-    const response = await api.post('/auth/signup', data);
-    // Note: signup no longer returns token immediately due to email verification
-    return response.data;
+    try {
+      const response = await api.post('/auth/signup', data);
+      // Note: signup no longer returns token immediately due to email verification
+      return response.data;
+    } catch (error: any) {
+      // Re-throw the error but don't log it to console
+      // The error will be handled by the component
+      throw error;
+    }
   },
 
   async getCurrentUser(): Promise<User> {
@@ -54,7 +60,7 @@ export const authService = {
   },
 
   async resetPassword(token: string, password: string) {
-    const response = await api.post('/auth/reset-password', { token, password });
+    const response = await api.post('/auth/reset-password', { token, newPassword: password });
     return response.data;
   },
 

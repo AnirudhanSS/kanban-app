@@ -259,4 +259,3 @@ For support, email support@kanban-app.com or create an issue in the GitHub repos
 
 ---
 
-**Built with ❤️ for collaborative productivity**

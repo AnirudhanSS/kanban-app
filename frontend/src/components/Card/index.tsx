@@ -3,14 +3,16 @@ import { Draggable } from '@hello-pangea/dnd';
 import { ThemeContext } from 'styled-components';
 import { Card as CardType } from '../../services/cardService';
 import { socketService } from '../../services/socketService';
+import { canDeleteCard, UserRole } from '../../utils/permissions';
 import Modal from '../Modal';
+import CommentsList from '../CommentsList';
 import { CardBorder, CardBottom, CardContainer, CardTitle, CardDescription, CardActions, ActionButton, UserIndicator, StatusIndicator } from './styles';
 // import Labels from '../Labels';
 
 interface CardProps {
   card: CardType;
   index: number;
-  userRole?: string;
+  userRole?: UserRole;
   onUpdate?: (cardId: string, updates: any) => void;
   onDelete?: (cardId: string) => void;
   // Visual feedback props
@@ -39,6 +41,7 @@ const Card: React.FC<CardProps> = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showComments, setShowComments] = useState(false);
 
   // Emit edit end event when modal is closed
   useEffect(() => {
@@ -209,27 +212,35 @@ const Card: React.FC<CardProps> = ({
                 {card.priority && (
                   <span>Priority: {card.priority}</span>
                 )}
-                {(userRole === 'editor' || userRole === 'admin' || userRole === 'owner') && (
-                  <div>
-                    <ActionButton 
-                      onClick={handleEdit} 
-                      disabled={isUpdating || isDeleting || isLockedByOther}
-                      title={isLockedByOther ? 'Card is locked by another user' : ''}
-                    >
-                      {isUpdating ? 'Updating...' : 'Edit'}
-                    </ActionButton>
-                    {(userRole === 'admin' || userRole === 'owner') && (
+                <div>
+                  <ActionButton 
+                    onClick={() => setShowComments(!showComments)}
+                    title="Toggle comments"
+                  >
+                    💬 {showComments ? 'Hide' : 'Show'} Comments
+                  </ActionButton>
+                  {(userRole === 'editor' || userRole === 'admin' || userRole === 'owner') && (
+                    <>
                       <ActionButton 
-                        onClick={handleDelete} 
-                        $danger 
+                        onClick={handleEdit} 
                         disabled={isUpdating || isDeleting || isLockedByOther}
                         title={isLockedByOther ? 'Card is locked by another user' : ''}
                       >
-                        {isDeleting ? 'Deleting...' : 'Delete'}
+                        {isUpdating ? 'Updating...' : 'Edit'}
                       </ActionButton>
-                    )}
-                  </div>
-                )}
+                      {canDeleteCard(userRole) && (
+                        <ActionButton 
+                          onClick={handleDelete} 
+                          $danger 
+                          disabled={isUpdating || isDeleting || isLockedByOther}
+                          title={isLockedByOther ? 'Card is locked by another user' : ''}
+                        >
+                          {isDeleting ? 'Deleting...' : 'Delete'}
+                        </ActionButton>
+                      )}
+                    </>
+                  )}
+                </div>
               </CardActions>
             </CardBottom>
             
@@ -238,6 +249,13 @@ const Card: React.FC<CardProps> = ({
           );
         }}
       </Draggable>
+
+      {showComments && (
+        <CommentsList 
+          cardId={card.id} 
+          userRole={userRole}
+        />
+      )}
 
       {showEditModal && (
         <Modal

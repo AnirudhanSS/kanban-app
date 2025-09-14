@@ -12,4 +12,9 @@ router.get('/members', adminController.listMembers);
 router.get('/audit-logs', adminController.listAuditLogs);
 router.get('/active-users', adminController.listActiveUsers);
 
+// Board-specific admin routes
+router.get('/boards/:boardId/members', adminController.getBoardMembers);
+router.get('/boards/:boardId/audit-logs', adminController.getBoardAuditLogs);
+router.get('/boards/:boardId/stats', adminController.getBoardStats);
+
 module.exports = router;

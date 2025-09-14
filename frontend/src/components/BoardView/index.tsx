@@ -7,9 +7,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cardService, Card } from '../../services/cardService';
 import { boardService, Column as ColumnType } from '../../services/boardService';
 import { columnService } from '../../services/columnService';
+import { canManageMembers, UserRole } from '../../utils/permissions';
 import Column from '../Column';
 import Header from '../Header';
 import MemberManagementModal from '../MemberManagementModal';
+import BoardAdminPanel from '../BoardAdminPanel';
+import ColumnManagement from '../ColumnManagement';
 import { 
   Container, 
   BoardHeader, 
@@ -39,6 +42,8 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showColumnManagement, setShowColumnManagement] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string>('viewer');
   
   // Visual feedback state
@@ -143,6 +148,7 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
   }, [showNotification]);
 
   const handleColumnUpdated = useCallback((updatedColumn: any) => {
+    console.log('📋 Column updated WebSocket event received:', updatedColumn);
     setColumns(prev => prev.map(column => 
       column.id === updatedColumn.id ? updatedColumn : column
     ));
@@ -175,7 +181,7 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
           newOrder.push(column);
         }
       });
-      console.log('🔄 Applying new column order from server');
+      console.log('🔄 Applying new column order from WebSocket:', newOrder.map(col => col.title));
       return newOrder;
     });
   }, []);
@@ -195,6 +201,22 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
     showNotification('Member removed from board', 'warning');
     // You might want to refresh member list or update UI
   }, [showNotification]);
+
+  // Board event handlers
+  const handleBoardUpdated = useCallback((updatedBoard: any) => {
+    console.log('📋 Board updated event received:', updatedBoard);
+    setBoard((prev: any) => prev ? { ...prev, ...updatedBoard } : updatedBoard);
+    showNotification('Board updated', 'info');
+  }, [showNotification]);
+
+  const handleBoardDeleted = useCallback((data: { boardId: string }) => {
+    console.log('🗑️ Board deleted event received:', data);
+    showNotification('Board has been deleted', 'warning');
+    // Redirect to dashboard or handle board deletion
+    if (onBackToDashboard) {
+      onBackToDashboard();
+    }
+  }, [showNotification, onBackToDashboard]);
 
   // Visual feedback event handlers
   const handleCardEditStart = useCallback((data: { cardId: string; userId: string; userName: string; field?: string }) => {
@@ -322,6 +344,9 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
       const newColumnOrder = Array.from(columns);
       const [reorderedColumn] = newColumnOrder.splice(source.index, 1);
       newColumnOrder.splice(destination.index, 0, reorderedColumn);
+      
+      // Optimistic update - update local state immediately
+      setColumns(newColumnOrder);
       
       const columnIds = newColumnOrder.map(col => col.id);
       await handleReorderColumns(columnIds);
@@ -477,6 +502,10 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
       socket.on('memberUpdated', handleMemberUpdated);
       socket.on('memberRemoved', handleMemberRemoved);
 
+      // Board events
+      socket.on('boardUpdated', handleBoardUpdated);
+      socket.on('boardDeleted', handleBoardDeleted);
+
       // Visual feedback events
       socket.on('card:edit_start', handleCardEditStart);
       socket.on('card:edit_end', handleCardEditEnd);
@@ -502,6 +531,10 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
         socket.off('memberAdded', handleMemberAdded);
         socket.off('memberUpdated', handleMemberUpdated);
         socket.off('memberRemoved', handleMemberRemoved);
+
+        // Board events
+        socket.off('boardUpdated', handleBoardUpdated);
+        socket.off('boardDeleted', handleBoardDeleted);
 
         // Visual feedback events
         socket.off('card:edit_start', handleCardEditStart);
@@ -579,21 +612,51 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
           </span>
           
           
-          {(currentUserRole === 'owner' || currentUserRole === 'admin') && (
-            <button
-              onClick={() => setShowMemberModal(true)}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.9rem'
-              }}
-            >
-              👥 Manage Members
-            </button>
+          {canManageMembers(currentUserRole as UserRole) && (
+            <>
+              <button
+                onClick={() => setShowMemberModal(true)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem'
+                }}
+              >
+                👥 Manage Members
+              </button>
+              <button
+                onClick={() => setShowAdminPanel(true)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#EB622F',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem'
+                }}
+              >
+                ⚙️ Admin Panel
+              </button>
+              <button
+                onClick={() => setShowColumnManagement(true)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#9C27B0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem'
+                }}
+              >
+                📋 Manage Columns
+              </button>
+            </>
           )}
         </div>
       </BoardHeader>
@@ -610,7 +673,7 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
                     id={column.id}
                     title={column.title}
                     cards={columnCards}
-                    userRole={currentUserRole}
+                    userRole={currentUserRole as UserRole}
                     onCreateCard={handleCreateCard}
                     onUpdateCard={handleUpdateCard}
                     onDeleteCard={handleDeleteCard}
@@ -633,6 +696,23 @@ const BoardView: React.FC<BoardViewProps> = ({ boardId, toggleTheme, onBackToDas
         onClose={() => setShowMemberModal(false)}
         boardId={boardId}
         currentUserRole={currentUserRole}
+      />
+
+      {showAdminPanel && (
+        <BoardAdminPanel
+          boardId={boardId}
+          boardName={board?.title || 'Board'}
+          onClose={() => setShowAdminPanel(false)}
+        />
+      )}
+
+      <ColumnManagement
+        isOpen={showColumnManagement}
+        onClose={() => setShowColumnManagement(false)}
+        boardId={boardId}
+        columns={columns}
+        userRole={currentUserRole as UserRole}
+        onColumnsUpdated={setColumns}
       />
     </Container>
   );

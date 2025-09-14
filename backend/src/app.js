@@ -23,9 +23,11 @@ app.use("/users", require("./routes/userRoutes"));
 app.use("/boards", require("./routes/boardRoutes"));
 app.use("/cards", require("./routes/cardRoutes"));
 app.use("/columns", require("./routes/columnRoutes"));
+app.use("/comments", require("./routes/commentRoutes"));
 app.use('/admin', require('./routes/adminRoutes'));
 app.use('/api/boards', boardRoutes);
 app.use('/api/cards', cardRoutes);
+app.use('/api/comments', require('./routes/commentRoutes'));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));

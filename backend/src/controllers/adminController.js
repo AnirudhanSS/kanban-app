@@ -10,19 +10,18 @@ exports.listBoards = async (req, res) => {
     const boards = await Board.findAll({
       include: [{
         model: BoardMember,
-        include: [{ model: User, attributes: ['id', 'name', 'email', 'username'] }],
+        include: [{ model: User, attributes: ['id', 'first_name', 'last_name', 'email'] }],
       }],
     });
 
     // Map boards to include members with roles
     const mapped = boards.map(board => ({
       id: board.id,
-      name: board.name,
+      name: board.title,
       members: board.BoardMembers.map(m => ({
         id: m.User.id,
-        name: m.User.name,
+        name: `${m.User.first_name} ${m.User.last_name || ''}`.trim(),
         email: m.User.email,
-        username: m.User.username,
         role: m.role,
       })),
     }));
@@ -37,7 +36,7 @@ exports.listBoards = async (req, res) => {
 exports.listMembers = async (req, res) => {
   try {
     const members = await BoardMember.findAll({
-      include: [{ model: User, attributes: ['id', 'name', 'email', 'username'] }],
+      include: [{ model: User, attributes: ['id', 'first_name', 'last_name', 'email'] }],
     });
 
     // Map with online status
@@ -47,9 +46,8 @@ exports.listMembers = async (req, res) => {
       boardId: m.board_id,
       userId: m.user_id,
       role: m.role,
-      name: m.User.name,
+      name: `${m.User.first_name} ${m.User.last_name || ''}`.trim(),
       email: m.User.email,
-      username: m.User.username,
       online: onlineUserIds.includes(String(m.user_id)), // cast to string just in case
     }));
 
@@ -77,12 +75,124 @@ exports.listActiveUsers = async (req, res) => {
 
     const users = await User.findAll({
       where: { id: onlineUserIds },
-      attributes: ['id', 'name', 'email', 'username'],
+      attributes: ['id', 'first_name', 'last_name', 'email'],
     });
 
     res.json(users.map(u => ({ ...u.toJSON(), online: true })));
   } catch (err) {
     console.error('listActiveUsers failed', err);
     res.status(500).json({ error: 'Failed to fetch active users' });
+  }
+};
+
+// Board-specific admin endpoints
+exports.getBoardMembers = async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    
+    // Check if user has admin/owner access to this board
+    const membership = await BoardMember.findOne({
+      where: { user_id: req.user.id, board_id: boardId, role: ['owner', 'admin'] }
+    });
+
+    if (!membership) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const members = await BoardMember.findAll({
+      where: { board_id: boardId },
+      include: [{ model: User, attributes: ['id', 'first_name', 'last_name', 'email'] }],
+    });
+
+    // Map with online status
+    const onlineUserIds = await getOnline(boardId);
+
+    const mapped = members.map(m => ({
+      id: m.User.id,
+      name: `${m.User.first_name} ${m.User.last_name || ''}`.trim(),
+      email: m.User.email,
+      role: m.role,
+      online: onlineUserIds.includes(String(m.User.id)),
+    }));
+
+    res.json(mapped);
+  } catch (err) {
+    console.error('getBoardMembers failed', err);
+    res.status(500).json({ error: 'Failed to fetch board members' });
+  }
+};
+
+exports.getBoardAuditLogs = async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    
+    // Check if user has admin/owner access to this board
+    const membership = await BoardMember.findOne({
+      where: { user_id: req.user.id, board_id: boardId, role: ['owner', 'admin'] }
+    });
+
+    if (!membership) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const logs = await AuditLog.findAll({ 
+      where: { board_id: boardId },
+      include: [{ model: User, attributes: ['id', 'first_name', 'last_name', 'email'] }],
+      order: [['created_at', 'DESC']],
+      limit: 100 // Limit to recent 100 activities
+    });
+
+    res.json(logs);
+  } catch (err) {
+    console.error('getBoardAuditLogs failed', err);
+    res.status(500).json({ error: 'Failed to fetch board audit logs' });
+  }
+};
+
+exports.getBoardStats = async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    
+    // Check if user has admin/owner access to this board
+    const membership = await BoardMember.findOne({
+      where: { user_id: req.user.id, board_id: boardId, role: ['owner', 'admin'] }
+    });
+
+    if (!membership) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get board info
+    const board = await Board.findByPk(boardId);
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
+    }
+
+    // Get member count
+    const memberCount = await BoardMember.count({ where: { board_id: boardId } });
+
+    // Get online users for this board
+    const onlineUserIds = await getOnline();
+    const onlineCount = onlineUserIds.length;
+
+    // Get recent activity count (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentActivityCount = await AuditLog.count({
+      where: { 
+        board_id: boardId,
+        created_at: { [require('sequelize').Op.gte]: sevenDaysAgo }
+      }
+    });
+
+    res.json({
+      boardName: board.title,
+      totalMembers: memberCount,
+      onlineMembers: onlineCount,
+      recentActivity: recentActivityCount
+    });
+  } catch (err) {
+    console.error('getBoardStats failed', err);
+    res.status(500).json({ error: 'Failed to fetch board stats' });
   }
 };

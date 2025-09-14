@@ -40,7 +40,7 @@ async function validateAssignee(assignee_id) {
 exports.createBoard = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const { title, description, is_public, background_color } = req.body;
+    const { title, description, is_public, background_color, skip_default_columns } = req.body;
     const owner_id = req.user.id;
 
     const board = await Board.create(
@@ -53,13 +53,16 @@ exports.createBoard = async (req, res, next) => {
       { transaction: t }
     );
 
-    const defaultColumns = [
-      { title: 'To Do', position: 1, board_id: board.id },
-      { title: 'In Progress', position: 2, board_id: board.id },
-      { title: 'Done', position: 3, board_id: board.id }
-    ];
+    // Only create default columns if not using a template
+    if (!skip_default_columns) {
+      const defaultColumns = [
+        { title: 'To Do', position: 1, board_id: board.id },
+        { title: 'In Progress', position: 2, board_id: board.id },
+        { title: 'Done', position: 3, board_id: board.id }
+      ];
 
-    await Column.bulkCreate(defaultColumns, { transaction: t });
+      await Column.bulkCreate(defaultColumns, { transaction: t });
+    }
 
     await t.commit();
 
@@ -108,7 +111,11 @@ exports.getBoards = async (req, res, next) => {
       include: [{ model: Board }]
     });
 
-    const boards = memberships.map(m => m.Board);
+    const boards = memberships.map(m => {
+      const boardData = m.Board.toJSON();
+      boardData.userRole = m.role;
+      return boardData;
+    });
     res.json(boards);
   } catch (err) {
     next(err);
@@ -239,7 +246,30 @@ exports.updateBoard = async (req, res, next) => {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
+    const oldValues = board.toJSON();
     await board.update(req.body);
+
+    // Create audit log
+    await AuditLog.create({
+      board_id: board.id,
+      user_id: req.user.id,
+      entity_type: 'board',
+      entity_id: board.id,
+      action: 'BoardUpdated',
+      old_values,
+      new_values: board.toJSON()
+    });
+
+    // Emit real-time update
+    if (req.io) {
+      try {
+        req.io.to(`board:${board.id}`).emit('boardUpdated', board);
+        console.log(`📋 Emitting boardUpdated event to board:${board.id}:`, board.toJSON());
+      } catch (emitError) {
+        console.error('Failed to emit board updated event:', emitError);
+      }
+    }
+
     res.json(board);
   } catch (err) {
     next(err);
@@ -255,8 +285,31 @@ exports.deleteBoard = async (req, res, next) => {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
+    const oldValues = board.toJSON();
     await board.destroy();
-    res.json({ message: 'Board deleted' });
+
+    // Create audit log
+    await AuditLog.create({
+      board_id: board.id,
+      user_id: req.user.id,
+      entity_type: 'board',
+      entity_id: board.id,
+      action: 'BoardDeleted',
+      old_values,
+      new_values: null
+    });
+
+    // Emit real-time update
+    if (req.io) {
+      try {
+        req.io.to(`board:${board.id}`).emit('boardDeleted', { boardId: board.id });
+        console.log(`🗑️ Emitting boardDeleted event to board:${board.id}:`, { boardId: board.id });
+      } catch (emitError) {
+        console.error('Failed to emit board deleted event:', emitError);
+      }
+    }
+
+    res.json({ message: 'Board deleted successfully' });
   } catch (err) {
     next(err);
   }

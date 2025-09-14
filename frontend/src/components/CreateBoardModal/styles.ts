@@ -227,3 +227,11 @@ export const Button = styled.button<{ $secondary?: boolean }>`
     }
   `}
 `;
+
+export const TemplateSection = styled.div`
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  background: ${props => props.theme.colors.components_background};
+`;

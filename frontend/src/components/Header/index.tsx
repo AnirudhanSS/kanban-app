@@ -47,6 +47,11 @@ const Header: React.FC<HeaderProps> = ({ toggleTheme, currentTheme }) => {
           </ThemeToggle>
         )}
         
+        {/* Admin panel removed from global header - only available within boards */}
+        {/* <AdminLink to="/admin">
+          ⚙️ Admin
+        </AdminLink> */}
+        
         <UserAvatar onClick={handleUserClick}>
           {user?.first_name?.charAt(0)?.toUpperCase() || 'U'}
         </UserAvatar>

@@ -4,7 +4,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "sync": "node src/db/syncTables.js"
+    "sync": "node src/db/syncTables.js",
+    "warmup": "node ../scripts/warmup.js"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +27,7 @@
     "react-router-dom": "^7.8.2",
     "sequelize": "^6.32.1",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "uuid": "^13.0.0"
   }
 }

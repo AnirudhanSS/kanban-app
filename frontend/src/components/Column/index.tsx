@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { Card } from '../../services/cardService';
+import { canCreateCards, UserRole } from '../../utils/permissions';
 import CardComponent from '../Card';
 import Modal from '../Modal';
 import { CardsList, Container, ColumnHeader, AddCardButton, DragHandle } from './styles';
@@ -9,7 +10,7 @@ interface ColumnProps {
   id: string;
   title: string;
   cards: Card[];
-  userRole?: string;
+  userRole?: UserRole;
   onCreateCard?: (cardData: any) => void;
   onUpdateCard?: (cardId: string, updates: any) => void;
   onDeleteCard?: (cardId: string) => void;
@@ -107,7 +108,7 @@ const Column: React.FC<ColumnProps> = ({
               )}
             </Droppable>
         
-            {(userRole === 'editor' || userRole === 'admin' || userRole === 'owner') && (
+            {canCreateCards(userRole) && (
               <AddCardButton onClick={() => setShowCreateModal(true)}>
                 + Add a card
               </AddCardButton>

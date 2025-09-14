@@ -53,15 +53,24 @@ exports.createColumn = async (req, res, next) => {
 exports.updateColumn = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const column = await Column.findByPk(req.params.id, { transaction: t });
+    const { id } = req.params;
+    const { title, color, card_limit } = req.body;
+
+    const column = await Column.findByPk(id, { transaction: t });
     if (!column) return res.status(404).json({ error: 'Column not found' });
 
-    if (!(await hasBoardPermission(req.user.id, column.board_id))) {
+    // Check permissions
+    if (!(await hasBoardPermission(req.user.id, column.board_id, ['owner','admin','editor']))) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
-    const old_values = column.toJSON();
-    await column.update(req.body, { transaction: t });
+    const oldValues = column.toJSON();
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (color !== undefined) updates.color = color;
+    if (card_limit !== undefined) updates.card_limit = card_limit;
+
+    await column.update(updates, { transaction: t });
 
     await AuditLog.create({
       board_id: column.board_id,
@@ -69,7 +78,7 @@ exports.updateColumn = async (req, res, next) => {
       entity_type: 'column',
       entity_id: column.id,
       action: 'ColumnUpdated',
-      old_values,
+      old_values: oldValues,
       new_values: column.toJSON()
     }, { transaction: t });
 
@@ -78,14 +87,78 @@ exports.updateColumn = async (req, res, next) => {
     // Emit real-time update
     if (req.io) {
       try {
-        req.io.to(`board:${column.board_id}`).emit('columnUpdated', column);
-        console.log(`📋 Emitting columnUpdated event to board:${column.board_id}:`, column.toJSON());
+        const columnData = column.toJSON();
+        req.io.to(`board:${column.board_id}`).emit('columnUpdated', columnData);
+        console.log(`📋 Emitting columnUpdated event to board:${column.board_id}:`, columnData);
       } catch (emitError) {
         console.error('Failed to emit column updated event:', emitError);
       }
+    } else {
+      console.warn('⚠️ req.io is not available for column update');
     }
     
     res.json(column);
+  } catch (err) {
+    await t.rollback();
+    next(err);
+  }
+};
+
+exports.deleteColumn = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+
+    const column = await Column.findByPk(id, { 
+      include: [{ model: require('../db/associations').Card }],
+      transaction: t 
+    });
+    if (!column) return res.status(404).json({ error: 'Column not found' });
+
+    // Check permissions
+    if (!(await hasBoardPermission(req.user.id, column.board_id, ['owner','admin','editor']))) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    // Move all cards to the first column if there are cards
+    if (column.Cards && column.Cards.length > 0) {
+      const firstColumn = await Column.findOne({
+        where: { board_id: column.board_id, id: { [require('sequelize').Op.ne]: id } },
+        order: [['position', 'ASC']],
+        transaction: t
+      });
+
+      if (firstColumn) {
+        await require('../db/associations').Card.update(
+          { column_id: firstColumn.id },
+          { where: { column_id: id }, transaction: t }
+        );
+      }
+    }
+
+    await AuditLog.create({
+      board_id: column.board_id,
+      user_id: req.user.id,
+      entity_type: 'column',
+      entity_id: column.id,
+      action: 'ColumnDeleted',
+      old_values: column.toJSON()
+    }, { transaction: t });
+
+    await column.destroy({ transaction: t });
+    await t.commit();
+    
+    // Emit real-time update
+    if (req.io) {
+      try {
+        req.io.to(`board:${column.board_id}`).emit('columnDeleted', { id });
+        console.log(`🗑️ Emitting columnDeleted event to board:${column.board_id}:`, id);
+      } catch (emitError) {
+        console.error('Failed to emit column deleted event:', emitError);
+      }
+    }
+    
+    res.json({ message: 'Column deleted successfully' });
   } catch (err) {
     await t.rollback();
     next(err);
@@ -151,6 +224,8 @@ exports.reorderColumns = async (req, res, next) => {
       } catch (emitError) {
         console.error('Failed to emit columns reordered event:', emitError);
       }
+    } else {
+      console.warn('⚠️ req.io is not available for columns reorder');
     }
     
     res.json({ message: 'Columns reordered successfully', columnIds });
@@ -160,44 +235,3 @@ exports.reorderColumns = async (req, res, next) => {
   }
 };
 
-exports.deleteColumn = async (req, res, next) => {
-  const t = await sequelize.transaction();
-  try {
-    const column = await Column.findByPk(req.params.id, { transaction: t });
-    if (!column) return res.status(404).json({ error: 'Column not found' });
-
-    if (!(await hasBoardPermission(req.user.id, column.board_id))) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    const old_values = column.toJSON();
-    await column.update({ is_archived: true }, { transaction: t });
-
-    await AuditLog.create({
-      board_id: column.board_id,
-      user_id: req.user.id,
-      entity_type: 'column',
-      entity_id: column.id,
-      action: 'ColumnArchived',
-      old_values,
-      new_values: column.toJSON()
-    }, { transaction: t });
-
-    await t.commit();
-    
-    // Emit real-time update
-    if (req.io) {
-      try {
-        req.io.to(`board:${column.board_id}`).emit('columnDeleted', { id: column.id, board_id: column.board_id });
-        console.log(`📋 Emitting columnDeleted event to board:${column.board_id}:`, { id: column.id });
-      } catch (emitError) {
-        console.error('Failed to emit column deleted event:', emitError);
-      }
-    }
-    
-    res.json({ message: 'Column archived' });
-  } catch (err) {
-    await t.rollback();
-    next(err);
-  }
-};

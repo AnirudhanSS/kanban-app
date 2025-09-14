@@ -1,10 +1,10 @@
 import React, { createContext, ReactNode, useContext, useState } from 'react';
-import ICard from '../interfaces/ICard';
+import { Card } from '../services/cardService';
 
 interface ModalContextData {
   visible: boolean;
-  toggleVisibility: (card: ICard | undefined) => void;
-  selectedCard: ICard | undefined;
+  toggleVisibility: (card: Card | undefined) => void;
+  selectedCard: Card | undefined;
 }
 
 interface ModalProviderProps {
@@ -15,9 +15,9 @@ const ModalContext = createContext<ModalContextData>({} as ModalContextData);
 
 const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
   const [visible, setVisible] = useState<boolean>(false);
-  const [selectedCard, setSelectedCard] = useState<ICard | undefined>();
+  const [selectedCard, setSelectedCard] = useState<Card | undefined>();
 
-  const toggleVisibility = (card: ICard | undefined) => {
+  const toggleVisibility = (card: Card | undefined) => {
     if (card) setSelectedCard(card);
     else setSelectedCard(undefined);
     setVisible(!visible);

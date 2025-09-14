@@ -5,6 +5,10 @@ export interface Column {
   title: string;
   position: number;
   board_id: string;
+  color?: string;
+  card_limit?: number;
+  is_archived: boolean;
+  version: number;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +36,7 @@ export interface CreateBoardData {
   description?: string;
   background_color?: string;
   is_public?: boolean;
+  skip_default_columns?: boolean;
 }
 
 export const boardService = {
